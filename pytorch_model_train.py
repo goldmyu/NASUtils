@@ -1,20 +1,22 @@
 import os
+import sys
 
 import torch
 import torchvision
 import torchvision.transforms as transforms
 import torch.optim as optim
 from torch import nn
+import numpy as np
 
-# from torch.utils.tensorboard import SummaryWriter
-
+from torch.utils.tensorboard import SummaryWriter
+# from torchsummary import summary
 
 from torch.utils.data import Dataset
 from config import config
 import logging
 
 # ============================= Logger Settings ========================================================================
-
+np.set_printoptions(threshold=sys.maxsize)
 
 save_path = "generated_files/training_logs/"
 if not os.path.exists(save_path):
@@ -22,7 +24,11 @@ if not os.path.exists(save_path):
 
 logger = logging.getLogger('pytorch')
 logger.setLevel(logging.DEBUG)
-formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+# formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+stream = logging.StreamHandler()
+logger.addHandler(stream)
+
+activations = {}
 
 
 # ========================================================================================================
@@ -31,13 +37,24 @@ formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(messag
 def set_logger(model_id):
     file_handler = logging.FileHandler(save_path + 'model-' + str(model_id) + '.log', mode='w')
     file_handler.setLevel(logging.DEBUG)
-    file_handler.setFormatter(formatter)
+    # file_handler.setFormatter(formatter)
     logger.addHandler(file_handler)
 
 
-def train_model(model, model_id):
-    set_logger(model_id)
+def get_activation(name):
+    def hook(model, input, output):
+        activations[name] = output.detach()
 
+    return hook
+
+
+def set_model_activation_output(model):
+    params = model.state_dict()
+    for name, _layer in model._modules.items():
+        _layer.register_forward_hook(get_activation(name))
+
+
+def train_model(model, model_id):
     transform = transforms.Compose([transforms.ToTensor(),
                                     transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))])
 
@@ -50,7 +67,25 @@ def train_model(model, model_id):
     criterion = nn.CrossEntropyLoss()
     optimizer = optim.Adam(model.parameters())
 
+    # ============================== TensorBoard Visualization ===============================================
+
+    # writer = SummaryWriter('generated_files/visualization/' + str(model_id))
+    writer = SummaryWriter('generated_files/visualization/')
+    images, labels = next(iter(trainloader))
+    grid = torchvision.utils.make_grid(images)
+    writer.add_image('images', grid, 0)
+    writer.add_graph(model, images)
+    # writer.flush()
+    writer.close()
+    # os.system('tensorboard --logdir=generated_files/visualization/')
+
+    # ========================================================================================================
+
+    set_logger(model_id)
+    set_model_activation_output(model)
+
     logger.info('Start training for model {}'.format(model_id))
+    logger.info('Model Summary:\n' + str(model))
     for epoch in range(2):  # loop over the dataset multiple times
         running_loss = 0.0
         for i, data in enumerate(trainloader, 0):
@@ -62,25 +97,34 @@ def train_model(model, model_id):
 
             # forward + backward + optimize
             outputs = model(inputs)
+
             loss = criterion(outputs, labels)
             loss.backward()
             optimizer.step()
 
             # print statistics
-            running_loss += loss.item()
-            if i % 200 == 199:  # print every 200 mini-batches
-                print('[Epoch : %d Iteration : %5d loss: %.3f]' %
-                      (epoch + 1, i + 1, running_loss / 200))
-                running_loss = 0.0
+            # running_loss += loss.item()
+            # if i % 200 == 199:  # print every 200 mini-batches
+            #     print('[Epoch : %d Iteration : %5d loss: %.3f]' %
+            #           (epoch + 1, i + 1, running_loss / 200))
+            #     running_loss = 0.0
 
-            # printing the network weights every 50 iterations
+            # printing the network stats every 50 iterations
             if i % 50 == 0:
-                logger.info('[Epoch : %d Iteration : %5d loss: %.3f]' % (epoch + 1, i + 1, running_loss / 200))
-                for layer_name, layer_params in model.named_parameters():
-                    logger.info(msg=[layer_name, layer_params.size(), layer_params])
+                # General training data
+                logger.info(
+                    'Training_stats - Epoch %d, Iteration %d, loss %.3f' % (epoch + 1, i + 1, running_loss / 200))
 
-                for layer_name, layer_params in model.named_modules():
-                    print(layer_params)
-                    pass
+                # Printing all layers weights and biases to log
+                for layer_name, layer_params in model.named_parameters():
+                    logger.info('{layer_name : ' + layer_name + ',\nlayer_shape: ' + str(list(layer_params.size())) +
+                                ',\nvalues:' + str(layer_params.data.numpy()) + ',\ngradient_values:' +
+                                str(layer_params.grad.numpy()) + '}')
+
+                # Printing all layers activations values to log
+                logger.info('All layers activations values:\n')
+                for layer_name, layer_activation in activations.items():
+                    logger.info(
+                        'layer_name : ' + layer_name + '\nactivation_values: ' + str(layer_activation.data.numpy()))
 
     print('Finished Training')

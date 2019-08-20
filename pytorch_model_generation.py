@@ -63,7 +63,6 @@ def create_pytorch_model(layer_collection, apply_fix=False):
     # TODO - refactor weights init to another method - add support for choosing wether to init weights or not
     # init.xavier_uniform_(list(model._modules.items())[-3][1].weight, gain=1)
     # init.constant_(list(model._modules.items())[-3][1].bias, 0)
-    print(model)
     return model
 
 
