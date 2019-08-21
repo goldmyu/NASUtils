@@ -33,7 +33,7 @@ def main():
     model = finalize_model(model_tuple.get('model'))
     print_model_structure(model)
     pytorch_model = create_pytorch_model(model, apply_fix=True)
-    train_model(pytorch_model, model_tuple.get('model_id'))
+    set_train_and_test_model(pytorch_model, model_tuple.get('model_id'))
 
     print(pytorch_model)
 
