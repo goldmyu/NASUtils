@@ -9,13 +9,13 @@ from pytorch_model_train import *
 def main():
     # TODO - these configurations are set for CIFAR-10 data-set, in the future make predefined set of configurations
     init_configurations(grid=False,
-                        population_size=10,
+                        population_size=1000,
                         max_network_depth=10,
                         max_network_parallel_layers=1,
                         num_classes=10,
-                        conv_max_height=7,
-                        conv_max_width=7,
-                        conv_max_channels=2,
+                        conv_max_height=20,
+                        conv_max_width=20,
+                        conv_max_channels=128,
                         conv_max_stride=1,
                         pool_max_height=2,
                         pool_max_width=2,

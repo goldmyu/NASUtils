@@ -10,6 +10,8 @@ import numpy as np
 
 from torch.utils.tensorboard import SummaryWriter
 # from torchsummary import summary
+# from tensorboardX import SummaryWriter
+
 
 from torch.utils.data import Dataset
 from config import config
@@ -28,6 +30,8 @@ if not os.path.exists(save_path):
 
 logger = logging.getLogger('pytorch')
 logger.setLevel(logging.DEBUG)
+
+
 # stream = logging.StreamHandler()
 # logger.addHandler(stream)
 
@@ -122,7 +126,8 @@ def train_model(model, model_id, trainloader):
             if iterations % 50 == 0:
                 # General training data
                 logger.info(
-                    'Training_stats - Epoch %d, Iteration %d, loss %.3f' % (epoch + 1, iterations + 1, running_loss / 200))
+                    'Training_stats - Epoch %d, Iteration %d, loss %.3f' % (
+                    epoch + 1, iterations + 1, running_loss / 200))
 
                 # Printing all layers weights and biases to log
                 for layer_name, layer_params in model.named_parameters():

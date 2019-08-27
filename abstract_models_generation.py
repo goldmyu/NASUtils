@@ -32,30 +32,30 @@ def random_model(max_network_depth):
         return random_model(max_network_depth)
 
 
-def uniform_model(n_layers, layer_type):
-    layer_collection = []
-    for i in range(n_layers):
-        layer = layer_type()
-        layer_collection.append(layer)
-    if check_legal_model(layer_collection):
-        return layer_collection
-    else:
-        return uniform_model(n_layers, layer_type)
+# def uniform_model(n_layers, layer_type):
+#     layer_collection = []
+#     for i in range(n_layers):
+#         layer = layer_type()
+#         layer_collection.append(layer)
+#     if check_legal_model(layer_collection):
+#         return layer_collection
+#     else:
+#         return uniform_model(n_layers, layer_type)
 
-
-# TODO - how is this different then random_model?
-def custom_model(layers):
-    layer_collection = []
-    for layer in layers:
-        layer_collection.append(layer())
-    if check_legal_model(layer_collection):
-        return layer_collection
-    else:
-        return custom_model(layers)
+#
+# # TODO - how is this different then random_model?
+# def custom_model(layers):
+#     layer_collection = []
+#     for layer in layers:
+#         layer_collection.append(layer())
+#     if check_legal_model(layer_collection):
+#         return layer_collection
+#     else:
+#         return custom_model(layers)
 
 
 def random_layer():
-    layers = [DropoutLayer, BatchNormLayer, ActivationLayer, ConvLayer, PoolingLayer, IdentityLayer]
+    layers = [DropoutLayer, BatchNormLayer, ActivationLayer, ConvLayer, PoolingLayer, IdentityLayer, LinearLayer]
     return layers[random.randint(0, len(layers) - 1)]()
 
 

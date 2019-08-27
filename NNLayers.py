@@ -80,19 +80,19 @@ class LinearLayer(Layer):
 # TODO - do we add support for 'dilation' and 'padding' for a conv layer?
 class ConvLayer(Layer):
     # @initializer
-    def __init__(self, height=None, width=None, channels=None, stride=None, name=None):
+    def __init__(self, height=None, width=None, out_channels=None, stride=None, name=None):
         Layer.__init__(self, name)
         if height is None:
             height = random.randint(1, config['conv_max_height'])
         if width is None:
             width = random.randint(1, config['conv_max_width'])
-        if channels is None:
-            channels = random.randint(1, config['conv_max_channels'])
+        if out_channels is None:
+            out_channels = random.randint(1, config['conv_max_channels'])
         if stride is None:
             stride = random.randint(1, config['conv_max_stride'])
         self.height = height
         self.width = width
-        self.channels = channels
+        self.channels = out_channels
         self.stride = stride
 
     def __str__(self):

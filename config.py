@@ -8,7 +8,7 @@ def init_configurations(grid,
                         num_classes,
                         conv_max_height,
                         conv_max_width,
-                        conv_max_channels,
+                        conv_max_channels,#filters
                         conv_max_stride,
                         pool_max_height,
                         pool_max_width,
