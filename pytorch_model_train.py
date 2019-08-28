@@ -30,8 +30,6 @@ if not os.path.exists(save_path):
 
 logger = logging.getLogger('pytorch')
 logger.setLevel(logging.DEBUG)
-
-
 # stream = logging.StreamHandler()
 # logger.addHandler(stream)
 
@@ -85,19 +83,19 @@ def train_model(model, model_id, trainloader):
     optimizer = optim.Adam(model.parameters())
 
     # ============================== TensorBoard Visualization ===============================================
-
-    # writer = SummaryWriter('generated_files/visualization/' + str(model_id))
-    writer = SummaryWriter('generated_files/visualization/')
+    #
+    # # writer = SummaryWriter('generated_files/visualization/' + str(model_id))
+    # # writer = SummaryWriter('generated_files/visualization/')
     # writer = SummaryWriter()
-
-    images, labels = next(iter(trainloader))
-    grid = torchvision.utils.make_grid(images)
-
-    writer.add_image('images', grid)
-    writer.add_graph(model, images)
-    writer.flush()
-    writer.close()
-    # os.system('tensorboard --logdir=generated_files/visualization/')
+    #
+    # images, labels = next(iter(trainloader))
+    # grid = torchvision.utils.make_grid(images)
+    #
+    # writer.add_image('images', grid)
+    # writer.add_graph(model=model, input_to_model=images, verbose=True)
+    # # writer.flush()
+    # writer.close()
+    # # os.system('tensorboard --logdir=generated_files/visualization/')
 
     # ========================================================================================================
 
@@ -106,9 +104,10 @@ def train_model(model, model_id, trainloader):
 
     logger.info('Start training for model {}'.format(model_id))
     logger.info('Model Summary:\n' + str(model))
-    for epoch in range(2):  # loop over the dataset multiple times
+    for epoch in range(config['num_of_epochs']):  # loop over the dataset multiple times
+        print('Started epoch {} of the model {} training'.format(epoch, model_id))
         running_loss = 0.0
-        for iterations, data in enumerate(trainloader, 0):
+        for iter, data in enumerate(trainloader, 0):
             # get the inputs; data is a list of [inputs, labels]
             inputs, labels = data
 
@@ -123,11 +122,11 @@ def train_model(model, model_id, trainloader):
             optimizer.step()
 
             # printing the network stats every 50 iterations
-            if iterations % 50 == 0:
+            if iter % 50 == 0:
                 # General training data
                 logger.info(
                     'Training_stats - Epoch %d, Iteration %d, loss %.3f' % (
-                    epoch + 1, iterations + 1, running_loss / 200))
+                    epoch + 1, iter + 1, running_loss / 200))
 
                 # Printing all layers weights and biases to log
                 for layer_name, layer_params in model.named_parameters():
@@ -142,11 +141,11 @@ def train_model(model, model_id, trainloader):
                         'layer_name : ' + layer_name + '\nactivation_values: ' + str(layer_activation.data.numpy()))
 
                 # print statistics
-                # running_loss += loss.item()
-                # if i % 200 == 199:  # print every 200 mini-batches
-                #     print('[Epoch : %d Iteration : %5d loss: %.3f]' %
-                #           (epoch + 1, i + 1, running_loss / 200))
-                #     running_loss = 0.0
+                running_loss += loss.item()
+                if iter % 200 == 199:  # print every 200 mini-batches
+                    print('[Epoch : %d Iteration : %5d loss: %.3f]' %
+                          (epoch + 1, iter + 1, running_loss / 200))
+                    running_loss = 0.0
 
     print('Finished Training')
 
@@ -162,8 +161,8 @@ def test_model(model, testloader):
             total += labels.size(0)
             correct += (predicted == labels).sum().item()
 
-    logger.info('Accuracy of the network on the 10000 test images: %d %%' % (
-            100 * correct / total))
+    logger.info('Accuracy of the network on test images: %d %%' % (100 * correct / total))
+    # logger.info('AUC of the network on test images: %d %%' % (100 * correct / total))
 
 # class Net(nn.Module):
 #     def __init__(self):

@@ -87,7 +87,7 @@ class ConvLayer(Layer):
         if width is None:
             width = random.randint(1, config['conv_max_width'])
         if out_channels is None:
-            out_channels = random.randint(1, config['conv_max_channels'])
+            out_channels = random.randint(1, config['conv_max_filters'])
         if stride is None:
             stride = random.randint(1, config['conv_max_stride'])
         self.height = height

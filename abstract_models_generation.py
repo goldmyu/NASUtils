@@ -55,7 +55,8 @@ def random_model(max_network_depth):
 
 
 def random_layer():
-    layers = [DropoutLayer, BatchNormLayer, ActivationLayer, ConvLayer, PoolingLayer, IdentityLayer, LinearLayer]
+    # layers = [DropoutLayer, BatchNormLayer, ActivationLayer, ConvLayer, PoolingLayer, IdentityLayer, LinearLayer]
+    layers = [DropoutLayer, BatchNormLayer, ActivationLayer, ConvLayer, PoolingLayer, IdentityLayer]
     return layers[random.randint(0, len(layers) - 1)]()
 
 
@@ -115,6 +116,7 @@ def get_model_true_depth(model):
 def initialize_population():
     population = []
 
+    print('initializing population...')
     if config['grid']:
         # TODO - support parallel layers and skip connections
         # model_init = random_grid_model
@@ -143,5 +145,6 @@ def save_abstract_models_to_csv(models_list):
     models_save_path = os.path.dirname(config['models_save_path'])
     if not os.path.exists(models_save_path):
         os.makedirs(models_save_path)
+    print('A list of {} models was saved to {} file'.format(len(models_list), models_save_path+'/abstract_models.csv'))
 
     abstract_models_df.to_csv(models_save_path+'/abstract_models.csv', index=False)
