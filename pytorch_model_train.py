@@ -9,8 +9,8 @@ from torch import nn
 import numpy as np
 from torch.utils.data.sampler import SubsetRandomSampler
 
+from torch.utils.tensorboard import SummaryWriter
 # import torch.nn.functional as F
-# from torch.utils.tensorboard import SummaryWriter
 # from torchsummary import summary
 # from tensorboardX import SummaryWriter
 # from torch.utils.data import Dataset
@@ -28,6 +28,7 @@ print(torchvision.__version__)
 print('CUDA available? {} Device is {}'.format(cuda_available, torch.cuda.device_count()))
 
 np.set_printoptions(threshold=sys.maxsize)
+activations = {}
 
 logger = logging.getLogger('pytorch')
 logger.setLevel(logging.DEBUG)
@@ -57,7 +58,18 @@ def set_logger(model_id):
     logger.addHandler(file_handler)
 
 
-activations = {}
+# For TensorBoard Visualization
+def write_model_summery(model, model_id, train_loader):
+    writer = SummaryWriter('generated_files/visualization/' + str(model_id))
+    # writer = SummaryWriter('generated_files/visualization/')
+    # writer = SummaryWriter()
+
+    images, labels = next(iter(train_loader))
+    grid = torchvision.utils.make_grid(images)
+    writer.add_image('images', grid)
+    writer.add_graph(model=model, input_to_model=images, verbose=True)
+    writer.flush()
+    writer.close()
 
 
 def get_activation(name):
@@ -78,7 +90,7 @@ def set_model_activation_output(model):
 def set_train_and_test_model(model, model_id):
     set_logger(model_id)
 
-    # this is for testing pourpose only - remove that after
+    # TODO - this is for testing purpose only - remove that after
     # model = Net()
 
     if cuda_available:
@@ -101,9 +113,6 @@ def set_train_and_test_model(model, model_id):
 
     trainset = torchvision.datasets.CIFAR10(root='./data-sets/cifar10', train=True,
                                             download=True, transform=transform)
-
-    # validset = torchvision.datasets.CIFAR10(root='./data-sets/cifar10', train=True,
-    #                                         download=True, transform=transform)
 
     testset = torchvision.datasets.CIFAR10(root='./data-sets/cifar10', train=False,
                                            download=True, transform=transform)
@@ -136,22 +145,8 @@ def train_model(model, model_id, train_loader, valid_loader):
     criterion = nn.CrossEntropyLoss().cuda(device=device)
     optimizer = optim.Adam(model.parameters(), lr=1e-3)
 
-    # ============================== TensorBoard Visualization ===============================================
-    #
-    # # writer = SummaryWriter('generated_files/visualization/' + str(model_id))
-    # # writer = SummaryWriter('generated_files/visualization/')
-    # writer = SummaryWriter()
-    #
-    # images, labels = next(iter(trainloader))
-    # grid = torchvision.utils.make_grid(images)
-    #
-    # writer.add_image('images', grid)
-    # writer.add_graph(model=model, input_to_model=images, verbose=True)
-    # # writer.flush()
-    # writer.close()
-    # # os.system('tensorboard --logdir=generated_files/visualization/')
-    #
-    # ========================================================================================================
+    # TODO - put this call back when running the experiment
+    # write_model_summery(model, model_id, train_loader)
 
     # Set hooks to get layers activations values
     set_model_activation_output(model)
@@ -232,8 +227,8 @@ def validation_check(epoch, model, model_id, prev_valid_loss, valid_loader):
     if epoch > config['min_num_of_epochs']:
         if curr_valid_loss >= prev_valid_loss:
             logger.info('Early stopping criteria is meet, stoping training\n'
-                        'current validation loss is {} previous validtion loss {}'.format(curr_valid_loss,
-                                                                                          prev_valid_loss))
+                        'current validation loss is {} previous validation loss {}'.format(curr_valid_loss,prev_valid_loss))
+
             return True, prev_valid_loss
         else:
             return False, curr_valid_loss
@@ -241,25 +236,27 @@ def validation_check(epoch, model, model_id, prev_valid_loss, valid_loader):
 
 def test_model(model, model_id, data_loader, validation_flag=False):
     criterion = nn.CrossEntropyLoss().cuda(device=device)
-    correct = 0
-    total = 0
+    correctly_labeled = 0
+    total_predictions = 0
     running_loss = 0
 
     with torch.no_grad():
         for data in data_loader:
+
             images, labels = data
-            images = images.cuda(device=device)
-            labels = labels.cuda(device=device)
+            if cuda_available:
+                inputs = inputs.cuda()
+                labels = labels.cuda()
 
             outputs = model(images)
             loss = criterion(outputs, labels)
             running_loss += loss.item()
 
             _, predicted = torch.max(outputs.data, 1)
-            total += labels.size(0)
-            correct += (predicted == labels).sum().item()
+            total_predictions += labels.size(0)
+            correctly_labeled += (predicted == labels).sum().item()
 
-    model_accuracy = correct/total
+    model_accuracy = correctly_labeled/total_predictions
 
     if validation_flag:
         logger.info('Model {} validation set accuracy is {}'.format(model_id, model_accuracy))
@@ -267,7 +264,7 @@ def test_model(model, model_id, data_loader, validation_flag=False):
     else:
         logger.info('Model {} test set accuracy is {}'.format(model_id, model_accuracy))
 
-#
+
 # class Net(nn.Module):
 #     def __init__(self):
 #         super(Net, self).__init__()
