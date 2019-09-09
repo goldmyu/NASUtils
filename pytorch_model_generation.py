@@ -10,7 +10,7 @@ from NNLayers import *
 
 def create_pytorch_model(layer_collection, apply_fix=False):
     model = nn.Sequential()
-    activations = {'relu': nn.ReLU, 'elu': nn.ELU, 'softmax': nn.Softmax, 'sigmoid': nn.Sigmoid}
+    activations_types = {'relu': nn.ReLU, 'elu': nn.ELU, 'softmax': nn.Softmax, 'sigmoid': nn.Sigmoid}
     input_shape = (config['batch_size'], config['dataset_channels'], config['dataset_height'], config['dataset_width'])
 
     for i in range(len(layer_collection)):
@@ -42,7 +42,7 @@ def create_pytorch_model(layer_collection, apply_fix=False):
                                                                            affine=True, eps=1e-5))
 
         elif isinstance(layer, ActivationLayer):
-            model.add_module(f'{type(layer).__name__}_{i}', activations[layer.activation_type]())
+            model.add_module(name=f'{type(layer).__name__}_{i}', module=activations_types[layer.activation_type]())
 
         elif isinstance(layer, DropoutLayer):
             model.add_module(f'{type(layer).__name__}_{i}', nn.Dropout(p=layer.rate))

@@ -9,7 +9,7 @@ from pytorch_model_train import *
 def main():
     # TODO - these configurations are set for CIFAR-10 data-set, in the future make predefined set of configurations
     init_configurations(grid=False,
-                        population_size=10000,
+                        population_size=100,
                         max_network_depth=20,
                         max_network_parallel_layers=1,
                         num_classes=10,
@@ -25,9 +25,12 @@ def main():
                         dataset_height=32,
                         dataset_width=32,
                         dataset_channels=3,
-                        batch_size=64,
+                        batch_size=128,
                         num_of_epochs=20,
-                        models_save_path='generated_files/')
+                        min_num_of_epochs=5,
+                        validation_size=0.2,
+                        logging_rate_initial=25,
+                        models_save_path='generated_files/experiment_1/')
 
     pop = initialize_population()
     model_tuple = pop[0]

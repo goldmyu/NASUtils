@@ -7,40 +7,53 @@ import torchvision.transforms as transforms
 import torch.optim as optim
 from torch import nn
 import numpy as np
+from torch.utils.data.sampler import SubsetRandomSampler
 
-from torch.utils.tensorboard import SummaryWriter
+# import torch.nn.functional as F
+# from torch.utils.tensorboard import SummaryWriter
 # from torchsummary import summary
 # from tensorboardX import SummaryWriter
+# from torch.utils.data import Dataset
 
-
-from torch.utils.data import Dataset
 from config import config
 import logging
 
 # ============================= General Settings =======================================================================
 
+cuda_available = torch.cuda.is_available()
+device = torch.device("cuda:0" if cuda_available else "cpu")
+
 print(torch.__version__)
 print(torchvision.__version__)
+print('CUDA available? {} Device is {}'.format(cuda_available, torch.cuda.device_count()))
 
 np.set_printoptions(threshold=sys.maxsize)
 
-save_path = "generated_files/training_logs/"
-if not os.path.exists(save_path):
-    os.makedirs(save_path)
-
 logger = logging.getLogger('pytorch')
 logger.setLevel(logging.DEBUG)
-# stream = logging.StreamHandler()
-# logger.addHandler(stream)
 
 
 # ========================== Helper methods ============================================================================
 
+class InfoFilter(logging.Filter):
+    def filter(self, rec):
+        return rec.levelno == logging.INFO
+
+
 def set_logger(model_id):
+    save_path = config['models_save_path'] + "/training_logs/"
+    if not os.path.exists(save_path):
+        os.makedirs(save_path)
+
+    # Set StreamHandler to print to stdout INFO msgs
+    stream = logging.StreamHandler(stream=sys.stdout)
+    stream.setLevel(logging.INFO)
+    stream.addFilter(InfoFilter())
+    logger.addHandler(stream)
+
+    # Other msgs will be logged to file (DEBUG)
     file_handler = logging.FileHandler(save_path + 'model-' + str(model_id) + '.log', mode='w')
     file_handler.setLevel(logging.DEBUG)
-    # formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
-    # file_handler.setFormatter(formatter)
     logger.addHandler(file_handler)
 
 
@@ -65,22 +78,63 @@ def set_model_activation_output(model):
 def set_train_and_test_model(model, model_id):
     set_logger(model_id)
 
-    transform = transforms.Compose([transforms.ToTensor(),
-                                    transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))])
+    # this is for testing pourpose only - remove that after
+    # model = Net()
 
-    trainset = torchvision.datasets.CIFAR10(root='./data-sets/cifar10', train=True, download=True, transform=transform)
-    trainloader = torch.utils.data.DataLoader(trainset, batch_size=config['batch_size'], shuffle=True, num_workers=2)
+    if cuda_available:
+        model = model.cuda()
+        logger.info('model parameters are cuda ? ' + str(next(model.parameters()).is_cuda))
 
-    testset = torchvision.datasets.CIFAR10(root='./data-sets/cifar10', train=False, download=True, transform=transform)
-    testloader = torch.utils.data.DataLoader(testset, batch_size=config['batch_size'], shuffle=False, num_workers=2)
+    valid_size = config['validation_size']
+    error_msg = "[!] valid_size should be in the range [0, 1]."
+    assert ((valid_size >= 0) and (valid_size <= 1)), error_msg
 
-    train_model(model, model_id, trainloader)
-    test_model(model, testloader)
+    # TODO -  These values are dedicated for CIFAR10 dataset need to generalize
+    normalize = transforms.Normalize(
+        mean=[0.4914, 0.4822, 0.4465],
+        std=[0.2023, 0.1994, 0.2010], )
+
+    transform = transforms.Compose([
+        transforms.ToTensor(),
+        normalize,
+    ])
+
+    trainset = torchvision.datasets.CIFAR10(root='./data-sets/cifar10', train=True,
+                                            download=True, transform=transform)
+
+    # validset = torchvision.datasets.CIFAR10(root='./data-sets/cifar10', train=True,
+    #                                         download=True, transform=transform)
+
+    testset = torchvision.datasets.CIFAR10(root='./data-sets/cifar10', train=False,
+                                           download=True, transform=transform)
+
+    num_train = len(trainset)
+    indices = list(range(num_train))
+    split = int(np.floor(valid_size * num_train))
+
+    np.random.seed()
+    np.random.shuffle(indices)
+
+    train_idx, valid_idx = indices[split:], indices[:split]
+    train_sampler = SubsetRandomSampler(train_idx)
+    valid_sampler = SubsetRandomSampler(valid_idx)
+
+    train_loader = torch.utils.data.DataLoader(trainset, batch_size=config['batch_size'],
+                                               sampler=train_sampler, num_workers=2, drop_last=True)
+
+    valid_loader = torch.utils.data.DataLoader(trainset, batch_size=config['batch_size'], sampler=valid_sampler,
+                                               num_workers=2)
+
+    test_loader = torch.utils.data.DataLoader(testset, batch_size=config['batch_size'], shuffle=False, num_workers=2)
+
+    # Train and then test the model
+    train_model(model, model_id, train_loader, valid_loader)
+    test_model(model, model_id, test_loader)
 
 
-def train_model(model, model_id, trainloader):
-    criterion = nn.CrossEntropyLoss()
-    optimizer = optim.Adam(model.parameters())
+def train_model(model, model_id, train_loader, valid_loader):
+    criterion = nn.CrossEntropyLoss().cuda(device=device)
+    optimizer = optim.Adam(model.parameters(), lr=1e-3)
 
     # ============================== TensorBoard Visualization ===============================================
     #
@@ -96,20 +150,31 @@ def train_model(model, model_id, trainloader):
     # # writer.flush()
     # writer.close()
     # # os.system('tensorboard --logdir=generated_files/visualization/')
-
+    #
     # ========================================================================================================
 
     # Set hooks to get layers activations values
     set_model_activation_output(model)
 
-    logger.info('Start training for model {}'.format(model_id))
-    logger.info('Model Summary:\n' + str(model))
+    logger.info('Start training for model {}'.format(model_id) + "\nModel Summary:\n' + str(model)")
+    logging_rate = config['logging_rate_initial']
+    prev_valid_loss = float('inf')
     for epoch in range(config['num_of_epochs']):  # loop over the dataset multiple times
-        print('Started epoch {} of the model {} training'.format(epoch, model_id))
+        logging_rate = logging_rate * (epoch + 1)
         running_loss = 0.0
-        for iter, data in enumerate(trainloader, 0):
+        epoch_correctly_labeled = 0
+        total = 0
+
+        logger.info('Started epoch {} of the model {} training\n'
+                    'Logging rate every {} iterations'.format(epoch, model_id, logging_rate))
+
+        for iter, data in enumerate(train_loader, 0):
             # get the inputs; data is a list of [inputs, labels]
             inputs, labels = data
+
+            if cuda_available:
+                inputs = inputs.cuda()
+                labels = labels.cuda()
 
             # zero the parameter gradients
             optimizer.zero_grad()
@@ -121,62 +186,105 @@ def train_model(model, model_id, trainloader):
             loss.backward()
             optimizer.step()
 
-            # printing the network stats every 50 iterations
-            if iter % 50 == 0:
-                # General training data
-                logger.info(
-                    'Training_stats - Epoch %d, Iteration %d, loss %.3f' % (
-                    epoch + 1, iter + 1, running_loss / 200))
+            running_loss += loss.item()
 
-                # Printing all layers weights and biases to log
+            _, predicted = torch.max(outputs.data, 1)
+            total += labels.size(0)
+            batch_correctly_labeled = (predicted == labels).sum().item()
+            epoch_correctly_labeled += batch_correctly_labeled
+
+            # logging the network stats according to the logging rate
+            if iter % logging_rate == 0:
+
+                # General training statistics
+                logger.info('Training stats ========= Epoch %d/%d ========= Iteration %d/%d ========= '
+                            'Batch Accuracy %.3f ========= loss %.3f =========' % (
+                                epoch + 1, config['num_of_epochs'], iter, len(train_loader),
+                                batch_correctly_labeled/config['batch_size'], running_loss/logging_rate))
+
+                running_loss = 0.0
+
+                # Layers weights, biases and gradients to log
                 for layer_name, layer_params in model.named_parameters():
-                    logger.info('{layer_name : ' + layer_name + ',\nlayer_shape: ' + str(list(layer_params.size())) +
-                                ',\nvalues:' + str(layer_params.data.numpy()) + ',\ngradient_values:' +
-                                str(layer_params.grad.numpy()) + '}')
+                    logger.debug('{layer_name : ' + layer_name + ',\nlayer_shape: ' + str(list(layer_params.size())) +
+                                 ',\nvalues:' + str(layer_params.data.cpu().numpy()) + ',\ngradient_values:' +
+                                 str(layer_params.grad.cpu().numpy()) + '}')
 
-                # Printing all layers activations values to log
-                logger.info('All layers activations values:\n')
+                # Layers activations values to log
+                logger.debug('All layers activations values:\n')
                 for layer_name, layer_activation in activations.items():
-                    logger.info(
-                        'layer_name : ' + layer_name + '\nactivation_values: ' + str(layer_activation.data.numpy()))
+                    logger.debug('layer_name : ' + layer_name + '\nactivation_values: '
+                                 + str(layer_activation.data.cpu().numpy()))
 
-                # print statistics
-                running_loss += loss.item()
-                if iter % 200 == 199:  # print every 200 mini-batches
-                    print('[Epoch : %d Iteration : %5d loss: %.3f]' %
-                          (epoch + 1, iter + 1, running_loss / 200))
-                    running_loss = 0.0
+        logger.info('Epoch {} Accuracy is {}'.format(epoch + 1, epoch_correctly_labeled / total))
 
-    print('Finished Training')
+        stop_flag, prev_valid_loss = validation_check(epoch, model, model_id, prev_valid_loss, valid_loader)
+        if stop_flag:
+            break
+
+    logger.info('Finished Training')
 
 
-def test_model(model, testloader):
+def validation_check(epoch, model, model_id, prev_valid_loss, valid_loader):
+    _, curr_valid_loss = test_model(model=model, model_id=model_id,
+                                    data_loader=valid_loader, validation_flag=True)
+
+    if epoch > config['min_num_of_epochs']:
+        if curr_valid_loss >= prev_valid_loss:
+            logger.info('Early stopping criteria is meet, stoping training\n'
+                        'current validation loss is {} previous validtion loss {}'.format(curr_valid_loss,
+                                                                                          prev_valid_loss))
+            return True, prev_valid_loss
+        else:
+            return False, curr_valid_loss
+
+
+def test_model(model, model_id, data_loader, validation_flag=False):
+    criterion = nn.CrossEntropyLoss().cuda(device=device)
     correct = 0
     total = 0
+    running_loss = 0
+
     with torch.no_grad():
-        for data in testloader:
+        for data in data_loader:
             images, labels = data
+            images = images.cuda(device=device)
+            labels = labels.cuda(device=device)
+
             outputs = model(images)
+            loss = criterion(outputs, labels)
+            running_loss += loss.item()
+
             _, predicted = torch.max(outputs.data, 1)
             total += labels.size(0)
             correct += (predicted == labels).sum().item()
 
-    logger.info('Accuracy of the network on test images: %d %%' % (100 * correct / total))
-    # logger.info('AUC of the network on test images: %d %%' % (100 * correct / total))
+    model_accuracy = correct/total
 
+    if validation_flag:
+        logger.info('Model {} validation set accuracy is {}'.format(model_id, model_accuracy))
+        return model_accuracy, running_loss
+    else:
+        logger.info('Model {} test set accuracy is {}'.format(model_id, model_accuracy))
+
+#
 # class Net(nn.Module):
 #     def __init__(self):
 #         super(Net, self).__init__()
 #         self.conv1 = nn.Conv2d(3, 6, 5)
-#         self.pool = nn.MaxPool2d(2, 2)
+#         self.batch_nrm1 = nn.BatchNorm2d(6)
 #         self.conv2 = nn.Conv2d(6, 16, 5)
+#         self.batch_nrm2 = nn.BatchNorm2d(16)
+#         self.pool = nn.MaxPool2d(2, 2)
+#
 #         self.fc1 = nn.Linear(16 * 5 * 5, 120)
 #         self.fc2 = nn.Linear(120, 84)
 #         self.fc3 = nn.Linear(84, 10)
 #
 #     def forward(self, x):
-#         x = self.pool(F.relu(self.conv1(x)))
-#         x = self.pool(F.relu(self.conv2(x)))
+#         x = self.pool(self.batch_nrm1(F.relu(self.conv1(x))))
+#         x = self.pool(self.batch_nrm2(F.relu(self.conv2(x))))
+#
 #         x = x.view(-1, 16 * 5 * 5)
 #         x = F.relu(self.fc1(x))
 #         x = F.relu(self.fc2(x))
