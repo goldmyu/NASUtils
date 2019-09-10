@@ -23,15 +23,13 @@ import logging
 cuda_available = torch.cuda.is_available()
 device = torch.device("cuda:0" if cuda_available else "cpu")
 
-print(torch.__version__)
-print(torchvision.__version__)
-print('CUDA available? {} Device is {}'.format(cuda_available, torch.cuda.device_count()))
+print('torch version {}\ntorchvision version {}'.format(torch.__version__, torchvision.__version__))
+print('CUDA available? {} Device is {}'.format(cuda_available, device))
 
 np.set_printoptions(threshold=sys.maxsize)
 activations = {}
 
 logger = logging.getLogger('pytorch')
-logger.setLevel(logging.DEBUG)
 
 
 # ========================== Helper methods ============================================================================
@@ -42,6 +40,8 @@ class InfoFilter(logging.Filter):
 
 
 def set_logger(model_id):
+    logger.setLevel(logging.DEBUG)
+
     save_path = config['models_save_path'] + "/training_logs/"
     if not os.path.exists(save_path):
         os.makedirs(save_path)
@@ -56,6 +56,8 @@ def set_logger(model_id):
     file_handler = logging.FileHandler(save_path + 'model-' + str(model_id) + '.log', mode='w')
     file_handler.setLevel(logging.DEBUG)
     logger.addHandler(file_handler)
+
+    logger.propagate = False
 
 
 # For TensorBoard Visualization
@@ -131,13 +133,13 @@ def set_train_and_test_model(model, model_id):
     train_loader = torch.utils.data.DataLoader(trainset, batch_size=config['batch_size'],
                                                sampler=train_sampler, num_workers=2, drop_last=True)
 
-    valid_loader = torch.utils.data.DataLoader(trainset, batch_size=config['batch_size'], sampler=valid_sampler,
-                                               num_workers=2)
+    validate_loader = torch.utils.data.DataLoader(trainset, batch_size=config['batch_size'], sampler=valid_sampler,
+                                                  num_workers=2)
 
     test_loader = torch.utils.data.DataLoader(testset, batch_size=config['batch_size'], shuffle=False, num_workers=2)
 
     # Train and then test the model
-    train_model(model, model_id, train_loader, valid_loader)
+    train_model(model, model_id, train_loader, validate_loader)
     test_model(model, model_id, test_loader)
 
 
@@ -151,17 +153,19 @@ def train_model(model, model_id, train_loader, valid_loader):
     # Set hooks to get layers activations values
     set_model_activation_output(model)
 
-    logger.info('Start training for model {}'.format(model_id) + "\nModel Summary:\n' + str(model)")
+    logger.info('Start training for model {}\nModel Summary\n{}'.format(model_id, model))
     logging_rate = config['logging_rate_initial']
     prev_valid_loss = float('inf')
-    for epoch in range(config['num_of_epochs']):  # loop over the dataset multiple times
+    max_num_of_epochs = config['max_num_of_epochs']
+
+    for epoch in range(max_num_of_epochs):  # loop over the dataset multiple times
         logging_rate = logging_rate * (epoch + 1)
         running_loss = 0.0
         epoch_correctly_labeled = 0
         total = 0
 
-        logger.info('Started epoch {} of the model {} training\n'
-                    'Logging rate every {} iterations'.format(epoch, model_id, logging_rate))
+        logger.info('Started training epoch {}/{}\n'
+                    'Logging rate every {} iterations'.format(epoch, max_num_of_epochs, logging_rate))
 
         for iter, data in enumerate(train_loader, 0):
             # get the inputs; data is a list of [inputs, labels]
@@ -194,8 +198,8 @@ def train_model(model, model_id, train_loader, valid_loader):
                 # General training statistics
                 logger.info('Training stats ========= Epoch %d/%d ========= Iteration %d/%d ========= '
                             'Batch Accuracy %.3f ========= loss %.3f =========' % (
-                                epoch + 1, config['num_of_epochs'], iter, len(train_loader),
-                                batch_correctly_labeled/config['batch_size'], running_loss/logging_rate))
+                                epoch + 1, max_num_of_epochs, iter, len(train_loader),
+                                batch_correctly_labeled / config['batch_size'], running_loss / logging_rate))
 
                 running_loss = 0.0
 
@@ -226,8 +230,9 @@ def validation_check(epoch, model, model_id, prev_valid_loss, valid_loader):
 
     if epoch > config['min_num_of_epochs']:
         if curr_valid_loss >= prev_valid_loss:
-            logger.info('Early stopping criteria is meet, stoping training\n'
-                        'current validation loss is {} previous validation loss {}'.format(curr_valid_loss,prev_valid_loss))
+            logger.info('Early stopping criteria is meet, stopping training\n'
+                        'current validation loss is {} previous validation loss {}'.format(curr_valid_loss,
+                                                                                           prev_valid_loss))
 
             return True, prev_valid_loss
         else:
@@ -256,14 +261,13 @@ def test_model(model, model_id, data_loader, validation_flag=False):
             total_predictions += labels.size(0)
             correctly_labeled += (predicted == labels).sum().item()
 
-    model_accuracy = correctly_labeled/total_predictions
+    model_accuracy = correctly_labeled / total_predictions
 
     if validation_flag:
         logger.info('Model {} validation set accuracy is {}'.format(model_id, model_accuracy))
         return model_accuracy, running_loss
     else:
         logger.info('Model {} test set accuracy is {}'.format(model_id, model_accuracy))
-
 
 # class Net(nn.Module):
 #     def __init__(self):

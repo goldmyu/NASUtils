@@ -50,7 +50,8 @@ def create_pytorch_model(layer_collection, apply_fix=False):
         elif isinstance(layer, IdentityLayer):
             # TODO - why add a layer here? just skip it
             # model.add_module(f'{type(layer).__name__}_{i}', IdentityModule())
-            print('IdentityLayer - not adding layer to model')
+            # print('IdentityLayer - not adding layer to model')
+            pass
 
         elif isinstance(layer, SqueezeLayer):
             model.add_module('squeeze', Squeeze_Layer())

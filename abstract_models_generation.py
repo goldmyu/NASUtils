@@ -28,7 +28,7 @@ def random_model(max_network_depth, attempets_num):
     if check_legal_model(layer_collection):
         return layer_collection, attempets_num
     else:
-        return random_model(max_network_depth, attempets_num+1)
+        return random_model(max_network_depth, attempets_num + 1)
 
 
 def random_layer():
@@ -92,6 +92,7 @@ def get_model_true_depth(model):
 
 def initialize_population():
     population = []
+    total_attempts = 0
     print('initializing population...')
 
     if config['grid']:
@@ -99,19 +100,22 @@ def initialize_population():
         # model_init = random_grid_model
         pass
     else:
-        for model_num in range(config['population_size']):
+        pop_size = config['population_size']
+        for model_num in range(pop_size):
             model_id = uuid.uuid4()
             new_rand_model, attemptes_num = random_model(config['max_network_depth'], attempets_num=0)
             population.append({'model_id': model_id, 'model': new_rand_model})
-            print('Random model number {} was created after {} attempts'.format(model_num+1, attemptes_num))
+            total_attempts += attemptes_num
+
+        print('Generated {} random models, avarege number of attempets per model creation was {}'.
+              format(pop_size, total_attempts / pop_size))
 
     save_abstract_models_to_csv(population)
-
     return population
 
 
 def save_abstract_models_to_csv(models_list):
-    abstract_models_df = pd.DataFrame(columns=['model_id','model_layers', 'model_depth', 'config'])
+    abstract_models_df = pd.DataFrame(columns=['model_id', 'model_layers', 'model_depth', 'config'])
 
     for model_tuple in models_list:
         model = model_tuple.get('model')
@@ -124,5 +128,6 @@ def save_abstract_models_to_csv(models_list):
     if not os.path.exists(models_save_path):
         os.makedirs(models_save_path)
 
-    abstract_models_df.to_csv(models_save_path+'/abstract_models.csv', index=False)
-    print('A list of {} models was saved to {} file'.format(len(models_list), models_save_path+'/abstract_models.csv'))
+    abstract_models_df.to_csv(models_save_path + '/abstract_models.csv', index=False)
+    print(
+        'A list of {} models was saved to {} file'.format(len(models_list), models_save_path + '/abstract_models.csv'))

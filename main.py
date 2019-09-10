@@ -26,7 +26,7 @@ def main():
                         dataset_width=32,
                         dataset_channels=3,
                         batch_size=128,
-                        num_of_epochs=20,
+                        max_num_of_epochs=20,
                         min_num_of_epochs=5,
                         validation_size=0.2,
                         logging_rate_initial=25,
