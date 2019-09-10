@@ -69,7 +69,7 @@ def create_pytorch_model(layer_collection, apply_fix=False):
 
 def fix_layers_dims(layer, prev_layer):
     # TODO - check layers dims with regard to previous layer and fix - Support Conv and max-pool
-    print("TODO - Need to implement fix_layers_dims()")
+    # print("TODO - Need to implement fix_layers_dims()")
     pass
 
 

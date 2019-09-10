@@ -27,6 +27,8 @@ print('torch version {}\ntorchvision version {}'.format(torch.__version__, torch
 print('CUDA available? {} Device is {}'.format(cuda_available, device))
 
 np.set_printoptions(threshold=sys.maxsize)
+torch.set_printoptions(threshold=sys.maxsize)
+
 activations = {}
 
 logger = logging.getLogger('pytorch')
@@ -206,37 +208,34 @@ def train_model(model, model_id, train_loader, valid_loader):
                 # Layers weights, biases and gradients to log
                 for layer_name, layer_params in model.named_parameters():
                     logger.debug('{layer_name : ' + layer_name + ',\nlayer_shape: ' + str(list(layer_params.size())) +
-                                 ',\nvalues:' + str(layer_params.data.cpu().numpy()) + ',\ngradient_values:' +
-                                 str(layer_params.grad.cpu().numpy()) + '}')
+                                 ',\nvalues:' + str(layer_params.data.cuda()) + ',\ngradient_values:' +
+                                 str(layer_params.grad.cuda()) + '}')
 
                 # Layers activations values to log
                 logger.debug('All layers activations values:\n')
                 for layer_name, layer_activation in activations.items():
                     logger.debug('layer_name : ' + layer_name + '\nactivation_values: '
-                                 + str(layer_activation.data.cpu().numpy()))
+                                 + str(layer_activation.data.cuda()))
+                                 # + str(layer_activation.data.cpu().numpy()))
 
         logger.info('Epoch {} Accuracy is {}'.format(epoch + 1, epoch_correctly_labeled / total))
 
-        stop_flag, prev_valid_loss = validation_check(epoch, model, model_id, prev_valid_loss, valid_loader)
+        stop_flag, prev_valid_loss = validate_model(epoch, model, model_id, prev_valid_loss, valid_loader)
         if stop_flag:
             break
 
     logger.info('Finished Training')
 
 
-def validation_check(epoch, model, model_id, prev_valid_loss, valid_loader):
-    _, curr_valid_loss = test_model(model=model, model_id=model_id,
-                                    data_loader=valid_loader, validation_flag=True)
+def validate_model(epoch, model, model_id, prev_valid_loss, valid_loader):
+    _, curr_valid_loss = test_model(model=model, model_id=model_id, data_loader=valid_loader, validation_flag=True)
+    logger.info('Validation set loss is {} previous validation loss {}'.format(curr_valid_loss, prev_valid_loss))
 
-    if epoch > config['min_num_of_epochs']:
-        if curr_valid_loss >= prev_valid_loss:
-            logger.info('Early stopping criteria is meet, stopping training\n'
-                        'current validation loss is {} previous validation loss {}'.format(curr_valid_loss,
-                                                                                           prev_valid_loss))
-
-            return True, prev_valid_loss
-        else:
-            return False, curr_valid_loss
+    if epoch > config['min_num_of_epochs'] and curr_valid_loss >= prev_valid_loss:
+        logger.info('Early stopping criteria is meet, stopping training')
+        return True, prev_valid_loss
+    else:
+        return False, curr_valid_loss
 
 
 def test_model(model, model_id, data_loader, validation_flag=False):
@@ -250,7 +249,7 @@ def test_model(model, model_id, data_loader, validation_flag=False):
 
             images, labels = data
             if cuda_available:
-                inputs = inputs.cuda()
+                images = images.cuda()
                 labels = labels.cuda()
 
             outputs = model(images)
