@@ -8,7 +8,7 @@ from NNLayers import *
 # ================================== Pytorch Code Genration ============================================================
 
 
-def create_pytorch_model(layer_collection, apply_fix=False):
+def create_pytorch_model(layer_collection, model_id, apply_fix=False):
     model = nn.Sequential()
     activations_types = {'relu': nn.ReLU, 'elu': nn.ELU, 'softmax': nn.Softmax, 'sigmoid': nn.Sigmoid}
     input_shape = (config['batch_size'], config['dataset_channels'], config['dataset_height'], config['dataset_width'])
@@ -64,6 +64,7 @@ def create_pytorch_model(layer_collection, apply_fix=False):
     # TODO - refactor weights init to another method - add support for choosing wether to init weights or not
     # init.xavier_uniform_(list(model._modules.items())[-3][1].weight, gain=1)
     # init.constant_(list(model._modules.items())[-3][1].bias, 0)
+    print('Created pytorch model for model {}'.format(model_id))
     return model
 
 

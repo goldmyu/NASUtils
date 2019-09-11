@@ -1,5 +1,6 @@
 import os
 import sys
+import time
 
 import torch
 import torchvision
@@ -55,7 +56,7 @@ def set_logger(model_id):
     logger.addHandler(stream)
 
     # Other msgs will be logged to file (DEBUG)
-    file_handler = logging.FileHandler(save_path + 'model-' + str(model_id) + '.log', mode='w')
+    file_handler = logging.FileHandler(filename=save_path + 'model-' + str(model_id) + '.log', mode='w')
     file_handler.setLevel(logging.DEBUG)
     logger.addHandler(file_handler)
 
@@ -146,7 +147,7 @@ def set_train_and_test_model(model, model_id):
 
 
 def train_model(model, model_id, train_loader, valid_loader):
-    criterion = nn.CrossEntropyLoss().cuda(device=device)
+    criterion = nn.CrossEntropyLoss().cuda()
     optimizer = optim.Adam(model.parameters(), lr=1e-3)
 
     # TODO - put this call back when running the experiment
@@ -164,7 +165,7 @@ def train_model(model, model_id, train_loader, valid_loader):
         logging_rate = logging_rate * (epoch + 1)
         running_loss = 0.0
         epoch_correctly_labeled = 0
-        total = 0
+        epoch_total_labeled = 0
 
         logger.info('Started training epoch {}/{}\n'
                     'Logging rate every {} iterations'.format(epoch, max_num_of_epochs, logging_rate))
@@ -190,13 +191,12 @@ def train_model(model, model_id, train_loader, valid_loader):
             running_loss += loss.item()
 
             _, predicted = torch.max(outputs.data, 1)
-            total += labels.size(0)
+            epoch_total_labeled += labels.size(0)
             batch_correctly_labeled = (predicted == labels).sum().item()
             epoch_correctly_labeled += batch_correctly_labeled
 
             # logging the network stats according to the logging rate
             if iter % logging_rate == 0:
-
                 # General training statistics
                 logger.info('Training stats ========= Epoch %d/%d ========= Iteration %d/%d ========= '
                             'Batch Accuracy %.3f ========= loss %.3f =========' % (
@@ -207,18 +207,21 @@ def train_model(model, model_id, train_loader, valid_loader):
 
                 # Layers weights, biases and gradients to log
                 for layer_name, layer_params in model.named_parameters():
-                    logger.debug('{layer_name : ' + layer_name + ',\nlayer_shape: ' + str(list(layer_params.size())) +
-                                 ',\nvalues:' + str(layer_params.data.cuda()) + ',\ngradient_values:' +
-                                 str(layer_params.grad.cuda()) + '}')
+                    logger.debug('{layer_name : ' + layer_name +
+                                 ',\nlayer_shape: ' + str(list(layer_params.size())) +
+                                 ',\nvalues:' + str(layer_params.data) +
+                                 ',\ngradient_values:' + str(layer_params.grad) + '}')
+                    print('Finished logging weights|biases|gradients of layer {}'.format(layer_name))
 
                 # Layers activations values to log
                 logger.debug('All layers activations values:\n')
                 for layer_name, layer_activation in activations.items():
-                    logger.debug('layer_name : ' + layer_name + '\nactivation_values: '
-                                 + str(layer_activation.data.cuda()))
+                    logger.debug('layer_name : ' + layer_name +
+                                 '\nactivation_values: ' + str(layer_activation.data))
                                  # + str(layer_activation.data.cpu().numpy()))
+                    print('Finished logging activations of layer {}'.format(layer_name))
 
-        logger.info('Epoch {} Accuracy is {}'.format(epoch + 1, epoch_correctly_labeled / total))
+        logger.info('Epoch {} Accuracy is {}'.format(epoch + 1, epoch_correctly_labeled / epoch_total_labeled))
 
         stop_flag, prev_valid_loss = validate_model(epoch, model, model_id, prev_valid_loss, valid_loader)
         if stop_flag:
@@ -239,7 +242,7 @@ def validate_model(epoch, model, model_id, prev_valid_loss, valid_loader):
 
 
 def test_model(model, model_id, data_loader, validation_flag=False):
-    criterion = nn.CrossEntropyLoss().cuda(device=device)
+    criterion = nn.CrossEntropyLoss().cuda()
     correctly_labeled = 0
     total_predictions = 0
     running_loss = 0
