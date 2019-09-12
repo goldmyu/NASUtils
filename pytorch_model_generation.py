@@ -48,7 +48,7 @@ def create_pytorch_model(layer_collection, model_id, apply_fix=False):
             model.add_module(f'{type(layer).__name__}_{i}', nn.Dropout(p=layer.rate))
 
         elif isinstance(layer, IdentityLayer):
-            # TODO - why add a layer here? just skip it
+            # why add a layer here? just skip it
             # model.add_module(f'{type(layer).__name__}_{i}', IdentityModule())
             # print('IdentityLayer - not adding layer to model')
             pass
@@ -69,8 +69,7 @@ def create_pytorch_model(layer_collection, model_id, apply_fix=False):
 
 
 def fix_layers_dims(layer, prev_layer):
-    # TODO - check layers dims with regard to previous layer and fix - Support Conv and max-pool
-    # print("TODO - Need to implement fix_layers_dims()")
+    # TODO - Add this for grid support - check layers dims with regard to previous layer - Support Conv and max-pool
     pass
 
 

@@ -36,8 +36,8 @@ def main():
     for _iter in range(config['population_size']):
         model_id, model = generate_abstract_model()
         pytorch_model = create_pytorch_model(model, model_id, apply_fix=True)
-        set_train_and_test_model(pytorch_model, model_id)
-        save_abstract_model_to_csv(model, model_id)
+        model_test_accuracy = set_train_and_test_model(pytorch_model, model_id)
+        save_abstract_model_to_csv(model, model_id, model_test_accuracy)
 
 
 if __name__ == "__main__":

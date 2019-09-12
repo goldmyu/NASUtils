@@ -2,7 +2,6 @@ import random
 from config import config
 
 
-# TODO - in some layers we have name and in some we dont, why is that?!?!?
 class Layer():
     def __init__(self, name=None):
         self.name = name
@@ -76,6 +75,7 @@ class LinearLayer(Layer):
 
     def __str__(self):
         return f'{{layer_type: \'LinearLayer\', output_dim:\'{self.output_dim}\', name:\'{self.name}\'}}'
+
 
 # TODO - do we add support for 'dilation' and 'padding' for a conv layer?
 class ConvLayer(Layer):

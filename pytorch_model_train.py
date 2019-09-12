@@ -19,6 +19,8 @@ from torch.utils.tensorboard import SummaryWriter
 from config import config
 import logging
 import logging.handlers
+import queue
+
 
 # ============================= General Settings =======================================================================
 
@@ -34,6 +36,7 @@ np.set_printoptions(threshold=sys.maxsize)
 torch.set_printoptions(threshold=sys.maxsize)
 
 activations = {}
+logger = logging.getLogger('pytorch')
 
 
 # ========================== Helper methods ============================================================================
@@ -49,7 +52,6 @@ def set_logger(model_id):
     if not os.path.exists(save_path):
         os.makedirs(save_path)
 
-    logger = logging.getLogger('pytorch')
     if logger.hasHandlers():
         logger.handlers.clear()
     logger.setLevel(logging.DEBUG)
@@ -65,15 +67,20 @@ def set_logger(model_id):
     file_handler.setLevel(logging.DEBUG)
 
     # MemoryHandler gets all msgs saves them in memory and fluch when capacity is reached
-    memory_handler = logging.handlers.MemoryHandler(capacity=1024 * 1000000000,
-                                                    flushLevel=logging.DEBUG,
-                                                    target=file_handler)
+    # memory_handler = logging.handlers.MemoryHandler(capacity=1024 * 1000000000,
+    #                                                 flushLevel=logging.DEBUG,
+    #                                                 target=file_handler)
 
-    # logger.addHandler(file_handler)
+    # Queue handler and listner
+    log_queue = queue.Queue(-1)
+    queue_handler = logging.handlers.QueueHandler(log_queue)
+    listener = logging.handlers.QueueListener(log_queue, file_handler)
+    listener.start()
+
+    logger.addHandler(file_handler)
+    logger.addHandler(queue_handler)
     logger.addHandler(stream)
-    logger.addHandler(memory_handler)
-
-    return logger
+    # logger.addHandler(memory_handler)
 
 
 # For TensorBoard Visualization
@@ -106,10 +113,7 @@ def set_model_activation_output(model):
 
 
 def set_train_and_test_model(model, model_id):
-    logger = set_logger(model_id)
-
-    # TODO - this is for testing purpose only - remove that after
-    # model = Net()
+    set_logger(model_id)
 
     if cuda_available:
         model = model.cuda()
@@ -155,16 +159,16 @@ def set_train_and_test_model(model, model_id):
     test_loader = torch.utils.data.DataLoader(testset, batch_size=config['batch_size'], shuffle=False, num_workers=2)
 
     # Train and then test the model
-    train_model(model, model_id, train_loader, validate_loader,logger)
-    test_model(model, model_id, test_loader,logger)
+    train_model(model, model_id, train_loader, validate_loader)
+    model_test_accuracy = test_model(model, model_id, test_loader)
+    return model_test_accuracy
 
 
-def train_model(model, model_id, train_loader, valid_loader,logger):
+def train_model(model, model_id, train_loader, valid_loader):
     criterion = nn.CrossEntropyLoss().cuda()
     optimizer = optim.Adam(model.parameters(), lr=1e-3)
 
-    # TODO - put this call back when running the experiment
-    # write_model_summery(model, model_id, train_loader)
+    write_model_summery(model, model_id, train_loader)
 
     # Set hooks to get layers activations values
     set_model_activation_output(model)
@@ -210,27 +214,31 @@ def train_model(model, model_id, train_loader, valid_loader,logger):
 
             # logging the network stats according to the logging rate
             if iter % logging_rate == 0:
-                logger.info('Training stats ========= Epoch %d/%d ========= Iteration %d/%d ========= '
-                            'Batch Accuracy %.3f ========= loss %.3f =========' % (
+                logger.info('Training stats ========= Epoch {}/{} ========= Iteration {}/{} ========= '
+                            'Batch Accuracy {} ========= loss {} ========='.format(
                                 epoch + 1, max_num_of_epochs, iter, len(train_loader),
                                 batch_correctly_labeled / config['batch_size'], running_loss / logging_rate))
 
                 running_loss = 0.0
 
                 # Layers weights, biases and gradients to log
-                print('{} Started logging weights|biases|gradients'.format(time.time()))
+                print('Started logging weights|biases|gradients'.format())
+                weight_strt = time.time()
                 for layer_name, layer_params in model.named_parameters():
                     logger.debug('layer_name {},\nlayer_shape {}\nvalues {} \ngradient_values {}'.
                                  format(layer_name, list(layer_params.size()), layer_params.data, layer_params.grad))
-                print('{} Finished logging weights|biases|gradients\n'.format(time.time()))
+                print('Finished logging weights|biases|gradients - time it took was {}Sec\n'.
+                      format(round(time.time()-weight_strt)))
 
+                # TODO - put activation logging back in in the future
                 # Layers activations values to log
-                logger.debug('All layers activations values:\n')
-                print('{} Started logging activations'.format(time.time()))
-                for layer_name, layer_activation in activations.items():
-                    logger.debug('layer_name {}\nactivation_values {}'.
-                                 format(layer_name, layer_activation.data))
-                print('{} Finished logging activations'.format(time.time()))
+                # logger.debug('All layers activations values:\n')
+                # print('Started logging activations'.format(time.time()))
+                # activ_strt = time.time()
+                # for layer_name, layer_activation in activations.items():
+                #     logger.debug('layer_name {}\nactivation_values {}'.
+                #                  format(layer_name, layer_activation.data))
+                # print('Finished logging activations - time it took was {}'.format(time.time()-activ_strt))
 
         logger.info('Epoch {} Accuracy is {}'.format(epoch + 1, epoch_correctly_labeled / epoch_total_labeled))
 
@@ -241,18 +249,19 @@ def train_model(model, model_id, train_loader, valid_loader,logger):
     logger.info('Finished Training')
 
 
-def validate_model(epoch, model, model_id, prev_valid_loss, valid_loader,logger):
-    _, curr_valid_loss = test_model(model=model, model_id=model_id, data_loader=valid_loader, loggger=logger, validation_flag=True)
-    logger.info('Validation set loss is {} previous validation loss {}'.format(curr_valid_loss, prev_valid_loss))
+def validate_model(epoch, model, model_id, prev_loss, valid_loader):
+    accuracy, curr_loss = test_model(model=model, model_id=model_id, data_loader=valid_loader, validation_flag=True)
+    logger.info('Validation set -- epoch {} -- accuracy {} -- loss {} -- previous loss {}'.
+                format(epoch, accuracy, curr_loss, prev_loss))
 
-    if epoch > config['min_num_of_epochs'] and curr_valid_loss >= prev_valid_loss:
+    if epoch > config['min_num_of_epochs'] and curr_loss >= prev_loss:
         logger.info('Early stopping criteria is meet, stopping training')
-        return True, prev_valid_loss
+        return True, prev_loss
     else:
-        return False, curr_valid_loss
+        return False, curr_loss
 
 
-def test_model(model, model_id, data_loader, logger,validation_flag=False):
+def test_model(model, model_id, data_loader, validation_flag=False):
     criterion = nn.CrossEntropyLoss().cuda()
     correctly_labeled = 0
     total_predictions = 0
@@ -277,10 +286,10 @@ def test_model(model, model_id, data_loader, logger,validation_flag=False):
     model_accuracy = correctly_labeled / total_predictions
 
     if validation_flag:
-        logger.info('Model {} validation set accuracy is {}'.format(model_id, model_accuracy))
         return model_accuracy, running_loss
     else:
-        logger.info('Model {} test set accuracy is {}'.format(model_id, model_accuracy))
+        logger.info('Test set accuracy is {}'.format(model_id, model_accuracy))
+        return model_accuracy
 
 # class Net(nn.Module):
 #     def __init__(self):
