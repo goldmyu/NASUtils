@@ -18,6 +18,7 @@ from torch.utils.tensorboard import SummaryWriter
 
 from config import config
 import logging
+import logging.handlers
 
 # ============================= General Settings =======================================================================
 
@@ -26,16 +27,17 @@ device = torch.device("cuda:0" if cuda_available else "cpu")
 
 print('torch version {}\ntorchvision version {}'.format(torch.__version__, torchvision.__version__))
 print('CUDA available? {} Device is {}'.format(cuda_available, device))
+if cuda_available:
+    print('Number of available CUDA devices {}'.format(torch.cuda.device_count()))
 
 np.set_printoptions(threshold=sys.maxsize)
 torch.set_printoptions(threshold=sys.maxsize)
 
 activations = {}
 
-logger = logging.getLogger('pytorch')
-
 
 # ========================== Helper methods ============================================================================
+
 
 class InfoFilter(logging.Filter):
     def filter(self, rec):
@@ -43,24 +45,35 @@ class InfoFilter(logging.Filter):
 
 
 def set_logger(model_id):
-    logger.setLevel(logging.DEBUG)
-
     save_path = config['models_save_path'] + "/training_logs/"
     if not os.path.exists(save_path):
         os.makedirs(save_path)
+
+    logger = logging.getLogger('pytorch')
+    if logger.hasHandlers():
+        logger.handlers.clear()
+    logger.setLevel(logging.DEBUG)
+    logger.propagate = False
 
     # Set StreamHandler to print to stdout INFO msgs
     stream = logging.StreamHandler(stream=sys.stdout)
     stream.setLevel(logging.INFO)
     stream.addFilter(InfoFilter())
-    logger.addHandler(stream)
 
     # Other msgs will be logged to file (DEBUG)
     file_handler = logging.FileHandler(filename=save_path + 'model-' + str(model_id) + '.log', mode='w')
     file_handler.setLevel(logging.DEBUG)
-    logger.addHandler(file_handler)
 
-    logger.propagate = False
+    # MemoryHandler gets all msgs saves them in memory and fluch when capacity is reached
+    memory_handler = logging.handlers.MemoryHandler(capacity=1024 * 1000000000,
+                                                    flushLevel=logging.DEBUG,
+                                                    target=file_handler)
+
+    # logger.addHandler(file_handler)
+    logger.addHandler(stream)
+    logger.addHandler(memory_handler)
+
+    return logger
 
 
 # For TensorBoard Visualization
@@ -93,7 +106,7 @@ def set_model_activation_output(model):
 
 
 def set_train_and_test_model(model, model_id):
-    set_logger(model_id)
+    logger = set_logger(model_id)
 
     # TODO - this is for testing purpose only - remove that after
     # model = Net()
@@ -142,11 +155,11 @@ def set_train_and_test_model(model, model_id):
     test_loader = torch.utils.data.DataLoader(testset, batch_size=config['batch_size'], shuffle=False, num_workers=2)
 
     # Train and then test the model
-    train_model(model, model_id, train_loader, validate_loader)
-    test_model(model, model_id, test_loader)
+    train_model(model, model_id, train_loader, validate_loader,logger)
+    test_model(model, model_id, test_loader,logger)
 
 
-def train_model(model, model_id, train_loader, valid_loader):
+def train_model(model, model_id, train_loader, valid_loader,logger):
     criterion = nn.CrossEntropyLoss().cuda()
     optimizer = optim.Adam(model.parameters(), lr=1e-3)
 
@@ -197,7 +210,6 @@ def train_model(model, model_id, train_loader, valid_loader):
 
             # logging the network stats according to the logging rate
             if iter % logging_rate == 0:
-                # General training statistics
                 logger.info('Training stats ========= Epoch %d/%d ========= Iteration %d/%d ========= '
                             'Batch Accuracy %.3f ========= loss %.3f =========' % (
                                 epoch + 1, max_num_of_epochs, iter, len(train_loader),
@@ -206,20 +218,19 @@ def train_model(model, model_id, train_loader, valid_loader):
                 running_loss = 0.0
 
                 # Layers weights, biases and gradients to log
+                print('{} Started logging weights|biases|gradients'.format(time.time()))
                 for layer_name, layer_params in model.named_parameters():
-                    logger.debug('{layer_name : ' + layer_name +
-                                 ',\nlayer_shape: ' + str(list(layer_params.size())) +
-                                 ',\nvalues:' + str(layer_params.data) +
-                                 ',\ngradient_values:' + str(layer_params.grad) + '}')
-                    print('Finished logging weights|biases|gradients of layer {}'.format(layer_name))
+                    logger.debug('layer_name {},\nlayer_shape {}\nvalues {} \ngradient_values {}'.
+                                 format(layer_name, list(layer_params.size()), layer_params.data, layer_params.grad))
+                print('{} Finished logging weights|biases|gradients\n'.format(time.time()))
 
                 # Layers activations values to log
                 logger.debug('All layers activations values:\n')
+                print('{} Started logging activations'.format(time.time()))
                 for layer_name, layer_activation in activations.items():
-                    logger.debug('layer_name : ' + layer_name +
-                                 '\nactivation_values: ' + str(layer_activation.data))
-                                 # + str(layer_activation.data.cpu().numpy()))
-                    print('Finished logging activations of layer {}'.format(layer_name))
+                    logger.debug('layer_name {}\nactivation_values {}'.
+                                 format(layer_name, layer_activation.data))
+                print('{} Finished logging activations'.format(time.time()))
 
         logger.info('Epoch {} Accuracy is {}'.format(epoch + 1, epoch_correctly_labeled / epoch_total_labeled))
 
@@ -230,8 +241,8 @@ def train_model(model, model_id, train_loader, valid_loader):
     logger.info('Finished Training')
 
 
-def validate_model(epoch, model, model_id, prev_valid_loss, valid_loader):
-    _, curr_valid_loss = test_model(model=model, model_id=model_id, data_loader=valid_loader, validation_flag=True)
+def validate_model(epoch, model, model_id, prev_valid_loss, valid_loader,logger):
+    _, curr_valid_loss = test_model(model=model, model_id=model_id, data_loader=valid_loader, loggger=logger, validation_flag=True)
     logger.info('Validation set loss is {} previous validation loss {}'.format(curr_valid_loss, prev_valid_loss))
 
     if epoch > config['min_num_of_epochs'] and curr_valid_loss >= prev_valid_loss:
@@ -241,7 +252,7 @@ def validate_model(epoch, model, model_id, prev_valid_loss, valid_loader):
         return False, curr_valid_loss
 
 
-def test_model(model, model_id, data_loader, validation_flag=False):
+def test_model(model, model_id, data_loader, logger,validation_flag=False):
     criterion = nn.CrossEntropyLoss().cuda()
     correctly_labeled = 0
     total_predictions = 0
