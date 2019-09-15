@@ -34,8 +34,9 @@ if cuda_available:
 
 np.set_printoptions(threshold=sys.maxsize)
 torch.set_printoptions(threshold=sys.maxsize)
-
+save_path = ""
 activations = {}
+
 logger = logging.getLogger('pytorch')
 
 
@@ -48,12 +49,15 @@ class InfoFilter(logging.Filter):
 
 
 def set_logger(model_id):
-    save_path = config['models_save_path'] + "/training_logs/"
+    global save_path
+    save_path = config['models_save_path'] + "model-" + str(model_id) + "/"
+
     if not os.path.exists(save_path):
         os.makedirs(save_path)
 
     if logger.hasHandlers():
         logger.handlers.clear()
+
     logger.setLevel(logging.DEBUG)
     logger.propagate = False
 
@@ -63,36 +67,35 @@ def set_logger(model_id):
     stream.addFilter(InfoFilter())
 
     # Other msgs will be logged to file (DEBUG)
-    file_handler = logging.FileHandler(filename=save_path + 'model-' + str(model_id) + '.log', mode='w')
+    file_handler = logging.FileHandler(filename=save_path + 'model-' + str(model_id) + '.log')
     file_handler.setLevel(logging.DEBUG)
 
     # MemoryHandler gets all msgs saves them in memory and fluch when capacity is reached
-    # memory_handler = logging.handlers.MemoryHandler(capacity=1024 * 1000000000,
-    #                                                 flushLevel=logging.DEBUG,
-    #                                                 target=file_handler)
+    memory_handler = logging.handlers.MemoryHandler(capacity=1024 * 1000000000,
+                                                    flushLevel=logging.DEBUG,
+                                                    target=file_handler)
 
     # Queue handler and listner
-    log_queue = queue.Queue(-1)
-    queue_handler = logging.handlers.QueueHandler(log_queue)
-    listener = logging.handlers.QueueListener(log_queue, file_handler)
-    listener.start()
+    # log_queue = queue.Queue(-1)
+    # queue_handler = logging.handlers.QueueHandler(log_queue)
+    # listener = logging.handlers.QueueListener(log_queue, file_handler)
+    # listener.start()
 
-    logger.addHandler(file_handler)
-    logger.addHandler(queue_handler)
+    # logger.addHandler(file_handler)
+    # logger.addHandler(queue_handler)
+    logger.addHandler(memory_handler)
     logger.addHandler(stream)
-    # logger.addHandler(memory_handler)
 
 
 # For TensorBoard Visualization
 def write_model_summery(model, model_id, train_loader):
-    writer = SummaryWriter('generated_files/visualization/' + str(model_id))
-    # writer = SummaryWriter('generated_files/visualization/')
-    # writer = SummaryWriter()
+    global save_path
+    writer = SummaryWriter(save_path)
 
     images, labels = next(iter(train_loader))
     grid = torchvision.utils.make_grid(images)
     writer.add_image('images', grid)
-    writer.add_graph(model=model, input_to_model=images, verbose=True)
+    writer.add_graph(model=model.cpu(), input_to_model=images, verbose=True)
     writer.flush()
     writer.close()
 
@@ -109,15 +112,37 @@ def set_model_activation_output(model):
         _layer.register_forward_hook(get_activation(name))
 
 
+def save_pytorch_model(model, model_id, optimizer, loss,epoch):
+    # TODO - save pytorch model checkpoint
+    global save_path
+    torch.save(obj={
+        'epoch': epoch,
+        'model_state_dict': model.state_dict(),
+        'optimizer_state_dict': optimizer.state_dict(),
+        'loss': loss}
+        , f=save_path + 'model-' + str(model_id) + '.pt')
+
+
+def load_pytorch_model(load_path):
+    model = nn.Sequential()
+    optimizer = optim.Adam()
+
+    checkpoint = torch.load(load_path)
+    model.load_state_dict(checkpoint['model_state_dict'])
+    optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
+    epoch = checkpoint['epoch']
+    loss = checkpoint['loss']
+
+    model.eval()
+    # - or -
+    # model.train()
+
+
 # ========================== Main methods ============================================================================
 
 
 def set_train_and_test_model(model, model_id):
     set_logger(model_id)
-
-    if cuda_available:
-        model = model.cuda()
-        logger.info('model parameters are cuda ? ' + str(next(model.parameters()).is_cuda))
 
     valid_size = config['validation_size']
     error_msg = "[!] valid_size should be in the range [0, 1]."
@@ -158,17 +183,22 @@ def set_train_and_test_model(model, model_id):
 
     test_loader = torch.utils.data.DataLoader(testset, batch_size=config['batch_size'], shuffle=False, num_workers=2)
 
+    write_model_summery(model, model_id, train_loader)
+
+    if cuda_available:
+        model = model.cuda()
+        logger.info('model parameters are cuda ? ' + str(next(model.parameters()).is_cuda))
+
     # Train and then test the model
-    train_model(model, model_id, train_loader, validate_loader)
+    num_of_train_epochs = train_model(model, model_id, train_loader, validate_loader)
     model_test_accuracy = test_model(model, model_id, test_loader)
-    return model_test_accuracy
+
+    return model_test_accuracy, num_of_train_epochs
 
 
 def train_model(model, model_id, train_loader, valid_loader):
     criterion = nn.CrossEntropyLoss().cuda()
     optimizer = optim.Adam(model.parameters(), lr=1e-3)
-
-    write_model_summery(model, model_id, train_loader)
 
     # Set hooks to get layers activations values
     set_model_activation_output(model)
@@ -177,6 +207,7 @@ def train_model(model, model_id, train_loader, valid_loader):
     logging_rate = config['logging_rate_initial']
     prev_valid_loss = float('inf')
     max_num_of_epochs = config['max_num_of_epochs']
+    num_of_train_epochs = max_num_of_epochs
 
     for epoch in range(max_num_of_epochs):  # loop over the dataset multiple times
         logging_rate = logging_rate * (epoch + 1)
@@ -185,7 +216,7 @@ def train_model(model, model_id, train_loader, valid_loader):
         epoch_total_labeled = 0
 
         logger.info('Started training epoch {}/{}\n'
-                    'Logging rate every {} iterations'.format(epoch, max_num_of_epochs, logging_rate))
+                    'Logging rate every {} iterations'.format(epoch+1, max_num_of_epochs, logging_rate))
 
         for iter, data in enumerate(train_loader, 0):
             # get the inputs; data is a list of [inputs, labels]
@@ -222,13 +253,13 @@ def train_model(model, model_id, train_loader, valid_loader):
                 running_loss = 0.0
 
                 # Layers weights, biases and gradients to log
-                print('Started logging weights|biases|gradients'.format())
-                weight_strt = time.time()
-                for layer_name, layer_params in model.named_parameters():
-                    logger.debug('layer_name {},\nlayer_shape {}\nvalues {} \ngradient_values {}'.
-                                 format(layer_name, list(layer_params.size()), layer_params.data, layer_params.grad))
-                print('Finished logging weights|biases|gradients - time it took was {}Sec\n'.
-                      format(round(time.time()-weight_strt)))
+                # print('Started logging weights|biases|gradients'.format())
+                # weight_strt = time.time()
+                # for layer_name, layer_params in model.named_parameters():
+                #     logger.debug('layer_name {},\nlayer_shape {}\nvalues {} \ngradient_values {}'.
+                #                  format(layer_name, list(layer_params.size()), layer_params.data, layer_params.grad))
+                # print('Finished logging weights|biases|gradients - time it took was {}Sec\n'.
+                #       format(round(time.time()-weight_strt)))
 
                 # TODO - put activation logging back in in the future
                 # Layers activations values to log
@@ -244,9 +275,12 @@ def train_model(model, model_id, train_loader, valid_loader):
 
         stop_flag, prev_valid_loss = validate_model(epoch, model, model_id, prev_valid_loss, valid_loader)
         if stop_flag:
+            num_of_train_epochs = epoch
             break
 
     logger.info('Finished Training')
+    save_pytorch_model(model, model_id, optimizer, loss, num_of_train_epochs)
+    return num_of_train_epochs
 
 
 def validate_model(epoch, model, model_id, prev_loss, valid_loader):

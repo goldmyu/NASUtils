@@ -30,14 +30,15 @@ def main():
                         min_num_of_epochs=5,
                         validation_size=0.2,
                         logging_rate_initial=25,
-                        models_save_path='generated_files/experiment_1/')
+                        models_save_path='generated_files/experiment_3_simple/')
 
     # population = initialize_population()
     for _iter in range(config['population_size']):
+        print('Creating the {}/{} model'.format(_iter, config['population_size']))
         model_id, model = generate_abstract_model()
         pytorch_model = create_pytorch_model(model, model_id, apply_fix=True)
-        model_test_accuracy = set_train_and_test_model(pytorch_model, model_id)
-        save_abstract_model_to_csv(model, model_id, model_test_accuracy)
+        model_test_accuracy, num_of_train_epochs = set_train_and_test_model(pytorch_model, model_id)
+        save_abstract_model_to_csv(model, model_id, model_test_accuracy, num_of_train_epochs)
 
 
 if __name__ == "__main__":

@@ -118,17 +118,22 @@ def generate_abstract_model():
     model_id = uuid.uuid4()
     model, attemptes_num = random_model(config['max_network_depth'], attempets_num=0)
     model = finalize_model(model)
-    print('Generated model {} number of attempets for creation was {}'.format(model_id, attemptes_num))
+    print('Generated model {} number of attempts for creation was {}'.format(model_id, attemptes_num))
     return model_id, model
 
 
-def save_abstract_model_to_csv(model, model_id, model_test_accuracy):
-    abstract_models_df = pd.DataFrame(columns=['model_id', 'model_layers', 'model_depth', 'model_test_accuracy','config'])
+def save_abstract_model_to_csv(model, model_id, model_test_accuracy, num_of_train_epochs):
+    abstract_models_df = pd.DataFrame(columns=['model_id', 'model_layers',
+                                               'model_depth', 'num_of_train_epochs',
+                                               'model_test_accuracy', 'config'])
 
     abstract_models_df = abstract_models_df.append(
-        {'model_id': model_id, 'model_layers': [str(layer) for layer in model],
-         'model_depth': get_model_true_depth(model), 'model_test_accuracy': model_test_accuracy, 'config': config},
-        ignore_index=True)
+        {'model_id': model_id,
+         'model_layers': [str(layer) for layer in model],
+         'model_depth': get_model_true_depth(model),
+         'num_of_train_epochs': num_of_train_epochs,
+         'model_test_accuracy': model_test_accuracy,
+         'config': config}, ignore_index=True)
 
     models_save_path = os.path.dirname(config['models_save_path'])
     if not os.path.exists(models_save_path):
