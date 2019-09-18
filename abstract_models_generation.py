@@ -1,4 +1,5 @@
 import copy
+import json
 import os
 import uuid
 
@@ -23,18 +24,45 @@ def print_model_structure(structure):
 
 def random_model(max_network_depth, attempets_num):
     layer_collection = []
+    prev_layer = None
     for i in range(max_network_depth):
-        layer_collection.append(random_layer())
+        prev_layer = random_layer(prev_layer)
+        layer_collection.append(prev_layer)
     if check_legal_model(layer_collection):
         return layer_collection, attempets_num
     else:
         return random_model(max_network_depth, attempets_num + 1)
 
 
-def random_layer():
-    # layers = [DropoutLayer, BatchNormLayer, ActivationLayer, ConvLayer, PoolingLayer, IdentityLayer, LinearLayer]
+def random_layer(prev_layer):
+    layers = []
+    if prev_layer is None:
+        # TODO - add support for linear layers
+        # layers = [DropoutLayer, BatchNormLayer, ActivationLayer, ConvLayer, PoolingLayer, IdentityLayer, LinearLayer]
+        layers = [DropoutLayer, BatchNormLayer, ActivationLayer, ConvLayer, PoolingLayer, IdentityLayer]
+        return layers[random.randint(0, len(layers) - 1)]()
+
+    # make sure no illegal modes are allowed like - dropout and dropout again etc
+    else:
+        if prev_layer is DropoutLayer:
+            layers = [BatchNormLayer, ActivationLayer, ConvLayer, PoolingLayer, IdentityLayer]
+            return layers[random.randint(0, len(layers) - 1)]()
+        elif prev_layer is BatchNormLayer:
+            layers = [DropoutLayer, ActivationLayer, ConvLayer, PoolingLayer, IdentityLayer]
+            return layers[random.randint(0, len(layers) - 1)]()
+
+        elif prev_layer is ActivationLayer:
+            layers = [DropoutLayer, BatchNormLayer, ConvLayer, PoolingLayer, IdentityLayer]
+            return layers[random.randint(0, len(layers) - 1)]()
+
+        elif prev_layer is PoolingLayer:
+            layers = [DropoutLayer, BatchNormLayer, ActivationLayer, ConvLayer, IdentityLayer]
+            return layers[random.randint(0, len(layers) - 1)]()
+
     layers = [DropoutLayer, BatchNormLayer, ActivationLayer, ConvLayer, PoolingLayer, IdentityLayer]
     return layers[random.randint(0, len(layers) - 1)]()
+
+
 
 
 # ========================== Model Validate and FIX ====================================================================
@@ -122,10 +150,17 @@ def generate_abstract_model():
     return model_id, model
 
 
+def save_configuration_as_json(models_save_path):
+    conf_file = models_save_path + '/config.json'
+    with open(conf_file, 'w') as fp:
+        json.dump(config, fp)
+        print('Configuration file was saved as JSON to {}'.format(conf_file))
+
+
 def save_abstract_model_to_csv(model, model_id, model_test_accuracy, num_of_train_epochs):
     abstract_models_df = pd.DataFrame(columns=['model_id', 'model_layers',
                                                'model_depth', 'num_of_train_epochs',
-                                               'model_test_accuracy', 'config'])
+                                               'model_test_accuracy'])
 
     abstract_models_df = abstract_models_df.append(
         {'model_id': model_id,
@@ -133,7 +168,7 @@ def save_abstract_model_to_csv(model, model_id, model_test_accuracy, num_of_trai
          'model_depth': get_model_true_depth(model),
          'num_of_train_epochs': num_of_train_epochs,
          'model_test_accuracy': model_test_accuracy,
-         'config': config}, ignore_index=True)
+         }, ignore_index=True)
 
     models_save_path = os.path.dirname(config['models_save_path'])
     if not os.path.exists(models_save_path):
@@ -142,8 +177,9 @@ def save_abstract_model_to_csv(model, model_id, model_test_accuracy, num_of_trai
     models_csv_file = models_save_path + '/abstract_models.csv'
     if os.path.isfile(models_csv_file):
         abstract_models_df.to_csv(models_csv_file, mode='a', header=False, index=False)
-        print('Model {} was added to {} file'.format(model_id, models_csv_file))
+        print('Abstract Model {} was saved to {} file'.format(model_id, models_csv_file))
 
     else:
         abstract_models_df.to_csv(models_csv_file, index=False)
         print('CSV file was created with name {} and Model {} was added to it'.format(model_id,models_csv_file))
+        save_configuration_as_json(models_save_path)
