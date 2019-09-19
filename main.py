@@ -68,7 +68,7 @@ def main():
                         min_num_of_epochs=5,
                         validation_size=0.2,
                         logging_rate_initial=10,
-                        models_save_path='generated_files/experiment_4_simple/')
+                        models_save_path='generated_files/experiment_1_new/')
 
     iterations = round(config['population_size'])
     for model_num in range(iterations):

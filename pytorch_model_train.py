@@ -270,13 +270,13 @@ class PytorchModel:
                     running_loss = 0.0
 
                     # Layers weights, biases and gradients to log
-                    # print('Started logging weights|biases|gradients'.format())
-                    # weight_strt = time.time()
-                    # for layer_name, layer_params in self.model.named_parameters():
-                    #     self.logger.debug('layer_name {},\nlayer_shape {}\nvalues {} \ngradient_values {}'.
-                    #                  format(layer_name, list(layer_params.size()), layer_params.data, layer_params.grad))
-                    # print('Finished logging weights|biases|gradients - time it took was {}Sec\n'.
-                    #       format(round(time.time()-weight_strt)))
+                    print('Started logging weights|biases|gradients'.format())
+                    weight_strt = time.time()
+                    for layer_name, layer_params in self.model.named_parameters():
+                        self.logger.debug('layer_name {},\nlayer_shape {}\nvalues {} \ngradient_values {}'.
+                                     format(layer_name, list(layer_params.size()), layer_params.data, layer_params.grad))
+                    print('Finished logging weights|biases|gradients - time it took was {}Sec\n'.
+                          format(round(time.time()-weight_strt)))
 
                     # TODO - put activation logging back in in the future
                     # Layers activations values to log

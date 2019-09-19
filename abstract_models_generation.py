@@ -35,7 +35,6 @@ def random_model(max_network_depth, attempets_num):
 
 
 def random_layer(prev_layer):
-    layers = []
     if prev_layer is None:
         # TODO - add support for linear layers
         # layers = [DropoutLayer, BatchNormLayer, ActivationLayer, ConvLayer, PoolingLayer, IdentityLayer, LinearLayer]
@@ -44,24 +43,24 @@ def random_layer(prev_layer):
 
     # make sure no illegal modes are allowed like - dropout and dropout again etc
     else:
-        if prev_layer is DropoutLayer:
+        if isinstance(prev_layer, DropoutLayer):
             layers = [BatchNormLayer, ActivationLayer, ConvLayer, PoolingLayer, IdentityLayer]
             return layers[random.randint(0, len(layers) - 1)]()
-        elif prev_layer is BatchNormLayer:
+
+        elif isinstance(prev_layer, BatchNormLayer):
             layers = [DropoutLayer, ActivationLayer, ConvLayer, PoolingLayer, IdentityLayer]
             return layers[random.randint(0, len(layers) - 1)]()
 
-        elif prev_layer is ActivationLayer:
+        elif isinstance(prev_layer ,ActivationLayer):
             layers = [DropoutLayer, BatchNormLayer, ConvLayer, PoolingLayer, IdentityLayer]
             return layers[random.randint(0, len(layers) - 1)]()
 
-        elif prev_layer is PoolingLayer:
+        elif isinstance(prev_layer ,PoolingLayer):
             layers = [DropoutLayer, BatchNormLayer, ActivationLayer, ConvLayer, IdentityLayer]
             return layers[random.randint(0, len(layers) - 1)]()
 
     layers = [DropoutLayer, BatchNormLayer, ActivationLayer, ConvLayer, PoolingLayer, IdentityLayer]
     return layers[random.randint(0, len(layers) - 1)]()
-
 
 
 
@@ -84,6 +83,17 @@ def check_legal_model(layer_collection):
         if height < 1 or width < 1:
             # print(f"illegal model, height={height}, width={width}")
             return False
+
+    # check no illegal connections
+    prev_layer = None
+    for layer in layer_collection:
+        if prev_layer is None:
+            pass
+        elif isinstance(layer, prev_layer):
+            print('illegal model, prev layer is {} and current layer is {}'.format(prev_layer, layer))
+            return False
+        else:
+            prev_layer = layer
     return True
 
 
