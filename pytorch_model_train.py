@@ -153,16 +153,8 @@ class PytorchModel:
         # model.train()
         return model
 
-    def save_dict_to_df(self, _temp_dict):
-        # Add the dict to the DF as a row
-        self.training_info_df = self.training_info_df.append(_temp_dict, ignore_index=True)
-
-    def log_weights_biases_gradients(self, _temp_dict, layer_name_and_type, layer_params):
-        # weight_strt = time.time()
-        # for layer_name, layer_params in self.model.named_parameters():
-        #     layer_name_type = layer_name.split('.')
-        #     _temp_dict['layer_name'] = layer_name_type[0]
-
+    @staticmethod
+    def log_weights_biases_gradients(_temp_dict, layer_name_and_type, layer_params):
         layer_data = layer_params.data
         _temp_dict[layer_name_and_type[1] + '_max'] = torch.max(layer_data).item()
         _temp_dict[layer_name_and_type[1] + '_min'] = torch.min(layer_data).item()
@@ -177,29 +169,9 @@ class PytorchModel:
         _temp_dict[layer_name_and_type[1] + '_gradient_var'] = torch.var(layer_grad).item()
         _temp_dict[layer_name_and_type[1] + '_gradient_std'] = torch.std(layer_grad).item()
 
-        # self.logger.debug('layer_name {},\n'
-        #                   'layer_shape {},\n'
-        #
-        #                   'layer_values_statistics :'
-        #                   'max {}, min {}, mean {}, var {}, std {},\n'
-        #
-        #                   'gradient_values_statistics : '
-        #                   'max {}, min {}, mean {}, var {}, std {}'
-        #                   .format(layer_name,
-        #                           list(layer_params.size()),
-        #                           layer_max, layer_min, layer_mean, layer_var, layer_std,
-        #                           grad_max, grad_min, grad_mean, grad_var, grad_std))
-        #
-        # print('Finished logging weights|biases|gradients statistics - time was {}Sec\n'
-        #       .format(round(time.time() - weight_strt)))
-
         return _temp_dict
 
     def log_activations(self, _temp_dict):
-        # print('Started logging activations'.format())
-        # actv_start = time.time()
-        # self.logger.debug('All layers activations values:\n')
-
         for layer_name_act, layer_activation in self.activations.items():
             if layer_name_act == _temp_dict['layer_name']:
                 # TODO - check 'goodness of fit' test against Unifrom, Normal, logNormal distributions
@@ -209,23 +181,6 @@ class PytorchModel:
                 _temp_dict['activation_var'] = torch.var(layer_activation).item()
                 _temp_dict['activation_std'] = torch.std(layer_activation).item()
                 break
-
-                # act_max = torch.max(layer_activation)
-                # act_min = torch.min(layer_activation)
-                # act_mean = torch.mean(layer_activation)
-                # act_var = torch.var(layer_activation)
-                # act_std = torch.std(layer_activation)
-            # else:
-            #     print('ERROR layer name for activation values is {} and dict layer name is {}'.
-            #           format(layer_name_act, _temp_dict['layer_name']))
-
-            # self.logger.debug('layer_activ_name {}\n'
-            #                   'activation_statistics :\n'
-            #                   'max {}, min {}, mean {}, var {}, std {}'
-            #                   .format(layer_name_act, act_max, act_min, act_mean, act_var, act_std))
-
-        # print('Finished logging activations - time was {}Sec\n'.format(round(time.time() - actv_start)))
-
         return _temp_dict
 
     def log_training_info(self, epoch, max_num_of_epochs, _iter,
@@ -247,7 +202,7 @@ class PytorchModel:
                 # This is for bias
                 if config['log_weights']:
                     temp_dict = self.log_weights_biases_gradients(temp_dict, layer_name_and_type, layer_params)
-                    self.save_dict_to_df(temp_dict)
+                    self.training_info_df = self.training_info_df.append(temp_dict, ignore_index=True)
                     temp_dict = {}
             else:
                 # this is for weights
@@ -260,8 +215,7 @@ class PytorchModel:
                 if config['log_activations']:
                     temp_dict = self.log_activations(temp_dict)
 
-
-    # ========================== Main methods ==============================================================================
+# ========================== Main methods ==============================================================================
 
     def set_train_and_test_model(self):
         self.set_logger()
@@ -387,7 +341,6 @@ class PytorchModel:
         self.training_info_df.to_csv(self.save_path + 'model-' + str(self.model_id) + '.csv', index=False)
         self.save_pytorch_model(optimizer, loss, num_of_train_epochs)
         return num_of_train_epochs
-
 
     def validate_model(self, epoch, prev_loss, valid_loader):
         accuracy, curr_loss = self.test_model(data_loader=valid_loader, validation_flag=True)
