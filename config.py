@@ -24,11 +24,14 @@ def init_configurations(grid,
                         min_num_of_epochs,
                         validation_size,
                         logging_rate_initial,
-                        models_save_path):
+                        models_save_path,
+                        log_weights=True,
+                        log_activations=True):
 
     global config
     for key, value in locals().items():
         config[key] = value
+
 
 
 

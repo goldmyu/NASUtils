@@ -3,44 +3,8 @@ from abstract_models_generation import *
 from pytorch_model_generation import *
 from pytorch_model_train import *
 
-# import concurrent.futures
-# import threading
-# from multiprocessing.pool import Pool
-# from concurrent.futures import ThreadPoolExecutor
-# from multiprocessing.dummy import Pool as ThreadPool
-
 
 # ======================================================================================================================
-
-
-# def create_train_store_model(_iter):
-#     print('Process pid {} thread {} is here with _iter {}'.format(os.getpid(), threading.current_thread().getName(),_iter))
-#     model_id, abstract_model = generate_abstract_model()
-#     model = create_pytorch_model(abstract_model, model_id, apply_fix=True)
-#     pytorch_model = PytorchModel(model=model, model_id=model_id, model_num=_iter)
-#     model_test_accuracy, num_of_train_epochs = pytorch_model.set_train_and_test_model()
-#     # save_abstract_model_to_csv(abstract_model, model_id, model_test_accuracy, num_of_train_epochs)
-#     print('thread {} finished'.format(threading.current_thread().getName()))
-#     return model_test_accuracy, num_of_train_epochs
-#
-
-# def test_threads(_iter, time_to_sleep=4):
-#     rnd = random.randint(1,10)
-#     for i in range(rnd):
-#         print('Process pid {} thread {} is here with _iter {}, now waiting {} sec'.
-#               format(os.getpid(), threading.current_thread().getName(),_iter,time_to_sleep))
-#
-#         time.sleep(time_to_sleep)
-#     return rnd
-
-#
-# def runParallely(num_of_workers, model_numbers):
-#     pool = Pool(num_of_workers)
-#     results = pool.map(create_train_store_model, model_numbers)
-#     pool.close()
-#     pool.join()
-#     print('all workers finished')
-#     return results
 
 
 def main():
@@ -68,7 +32,9 @@ def main():
                         min_num_of_epochs=5,
                         validation_size=0.2,
                         logging_rate_initial=10,
-                        models_save_path='generated_files/experiment_1_new/')
+                        models_save_path='generated_files/experiment_6/',
+                        log_weights=True,
+                        log_activations=True)
 
     iterations = round(config['population_size'])
     for model_num in range(iterations):
@@ -77,6 +43,7 @@ def main():
         pytorch_model = PytorchModel(model=model, model_id=model_id, model_num=model_num)
         model_test_accuracy, num_of_train_epochs = pytorch_model.set_train_and_test_model()
         save_abstract_model_to_csv(abstract_model, model_id, model_test_accuracy, num_of_train_epochs)
+
 
 
 if __name__ == "__main__":

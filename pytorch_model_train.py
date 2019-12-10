@@ -1,6 +1,5 @@
 import os
 import sys
-import time
 
 import torch
 import torchvision
@@ -8,13 +7,9 @@ import torchvision.transforms as transforms
 import torch.optim as optim
 from torch import nn
 import numpy as np
+import pandas as pd
 from torch.utils.data.sampler import SubsetRandomSampler
-
 from torch.utils.tensorboard import SummaryWriter
-# import torch.nn.functional as F
-# from torchsummary import summary
-# from tensorboardX import SummaryWriter
-# from torch.utils.data import Dataset
 
 from config import config
 import logging
@@ -47,6 +42,18 @@ class PytorchModel:
         self.save_path = config['models_save_path'] + "model-" + str(model_id) + "/"
         self.activations = {}
         self.logger = logging.getLogger('pytorch_' + str(model_num))
+        self.training_info_df = pd.DataFrame(columns=['layer_name',
+                                                      'weight_max', 'weight_min', 'weight_mean', 'weight_var',
+                                                      'weight_std',
+                                                      'bias_max', 'bias_min', 'bias_mean', 'bias_var', 'bias_std',
+                                                      'weight_gradient_max', 'weight_gradient_min',
+                                                      'weight_gradient_mean', 'weight_gradient_var',
+                                                      'weight_gradient_std',
+                                                      'bias_gradient_max', 'bias_gradient_min', 'bias_gradient_mean',
+                                                      'bias_gradient_var', 'bias_gradient_std',
+                                                      'activation_max', 'activation_min', 'activation_mean',
+                                                      'activation_var', 'activation_std',
+                                                      'iteration', 'epoch'])
 
     # ========================== Helper methods ============================================================================
 
@@ -73,7 +80,7 @@ class PytorchModel:
         file_handler.setLevel(logging.DEBUG)
         # file_handler.setFormatter(formatter)
 
-        # MemoryHandler gets all msgs saves them in memory and fluch when capacity is reached
+        # MemoryHandler gets all msgs saves them in memory and flush when capacity is reached
         memory_handler = logging.handlers.MemoryHandler(capacity=1024 * 1000000000,
                                                         flushLevel=logging.DEBUG,
                                                         target=file_handler)
@@ -85,19 +92,17 @@ class PytorchModel:
         # listener.start()
 
         # logger.addHandler(file_handler)
-        # logger.addHandler(queue_handler)
+        # self.logger.addHandler(queue_handler)
         self.logger.addHandler(memory_handler)
         self.logger.addHandler(stream)
 
-    # For TensorBoard Visualization
     def write_model_summery(self, train_loader):
         writer = SummaryWriter(self.save_path)
 
         images, labels = next(iter(train_loader))
         grid = torchvision.utils.make_grid(images)
         writer.add_image('images', grid)
-        writer.add_graph(model=self.model.cpu(), input_to_model=images, verbose=True)
-        writer.flush()
+        writer.add_graph(model=self.model.cpu(), input_to_model=images, verbose=False)
         writer.close()
 
     def get_activation(self, name):
@@ -148,7 +153,115 @@ class PytorchModel:
         # model.train()
         return model
 
-    # ========================== Main methods ============================================================================
+    def save_dict_to_df(self, _temp_dict):
+        # Add the dict to the DF as a row
+        self.training_info_df = self.training_info_df.append(_temp_dict, ignore_index=True)
+
+    def log_weights_biases_gradients(self, _temp_dict, layer_name_and_type, layer_params):
+        # weight_strt = time.time()
+        # for layer_name, layer_params in self.model.named_parameters():
+        #     layer_name_type = layer_name.split('.')
+        #     _temp_dict['layer_name'] = layer_name_type[0]
+
+        layer_data = layer_params.data
+        _temp_dict[layer_name_and_type[1] + '_max'] = torch.max(layer_data).item()
+        _temp_dict[layer_name_and_type[1] + '_min'] = torch.min(layer_data).item()
+        _temp_dict[layer_name_and_type[1] + '_mean'] = torch.mean(layer_data).item()
+        _temp_dict[layer_name_and_type[1] + '_var'] = torch.var(layer_data).item()
+        _temp_dict[layer_name_and_type[1] + '_std'] = torch.std(layer_data).item()
+
+        layer_grad = layer_params.grad
+        _temp_dict[layer_name_and_type[1] + '_gradient_max'] = torch.max(layer_grad).item()
+        _temp_dict[layer_name_and_type[1] + '_gradient_min'] = torch.min(layer_grad).item()
+        _temp_dict[layer_name_and_type[1] + '_gradient_mean'] = torch.mean(layer_grad).item()
+        _temp_dict[layer_name_and_type[1] + '_gradient_var'] = torch.var(layer_grad).item()
+        _temp_dict[layer_name_and_type[1] + '_gradient_std'] = torch.std(layer_grad).item()
+
+        # self.logger.debug('layer_name {},\n'
+        #                   'layer_shape {},\n'
+        #
+        #                   'layer_values_statistics :'
+        #                   'max {}, min {}, mean {}, var {}, std {},\n'
+        #
+        #                   'gradient_values_statistics : '
+        #                   'max {}, min {}, mean {}, var {}, std {}'
+        #                   .format(layer_name,
+        #                           list(layer_params.size()),
+        #                           layer_max, layer_min, layer_mean, layer_var, layer_std,
+        #                           grad_max, grad_min, grad_mean, grad_var, grad_std))
+        #
+        # print('Finished logging weights|biases|gradients statistics - time was {}Sec\n'
+        #       .format(round(time.time() - weight_strt)))
+
+        return _temp_dict
+
+    def log_activations(self, _temp_dict):
+        # print('Started logging activations'.format())
+        # actv_start = time.time()
+        # self.logger.debug('All layers activations values:\n')
+
+        for layer_name_act, layer_activation in self.activations.items():
+            if layer_name_act == _temp_dict['layer_name']:
+                # TODO - check 'goodness of fit' test against Unifrom, Normal, logNormal distributions
+                _temp_dict['activation_max'] = torch.max(layer_activation).item()
+                _temp_dict['activation_min'] = torch.min(layer_activation).item()
+                _temp_dict['activation_mean'] = torch.mean(layer_activation).item()
+                _temp_dict['activation_var'] = torch.var(layer_activation).item()
+                _temp_dict['activation_std'] = torch.std(layer_activation).item()
+                break
+
+                # act_max = torch.max(layer_activation)
+                # act_min = torch.min(layer_activation)
+                # act_mean = torch.mean(layer_activation)
+                # act_var = torch.var(layer_activation)
+                # act_std = torch.std(layer_activation)
+            # else:
+            #     print('ERROR layer name for activation values is {} and dict layer name is {}'.
+            #           format(layer_name_act, _temp_dict['layer_name']))
+
+            # self.logger.debug('layer_activ_name {}\n'
+            #                   'activation_statistics :\n'
+            #                   'max {}, min {}, mean {}, var {}, std {}'
+            #                   .format(layer_name_act, act_max, act_min, act_mean, act_var, act_std))
+
+        # print('Finished logging activations - time was {}Sec\n'.format(round(time.time() - actv_start)))
+
+        return _temp_dict
+
+    def log_training_info(self, epoch, max_num_of_epochs, _iter,
+                          train_loader, batch_correctly_labeled, running_loss, logging_rate):
+
+        # logging the network stats according to the logging rate
+        self.logger.info('Training stats ========= Epoch {}/{} ========= Iteration {}/{} ========= '
+                         'Batch Accuracy {} ========= loss {} ========='.
+                         format(epoch + 1, max_num_of_epochs, _iter, len(train_loader),
+                                batch_correctly_labeled / config['batch_size'],
+                                running_loss / logging_rate))
+
+        temp_dict = {}
+        # This happens for every layer in the model
+        for layer_name, layer_params in self.model.named_parameters():
+            layer_name_and_type = layer_name.split('.')
+
+            if 'layer_name' in temp_dict.keys():
+                # This is for bias
+                if config['log_weights']:
+                    temp_dict = self.log_weights_biases_gradients(temp_dict, layer_name_and_type, layer_params)
+                    self.save_dict_to_df(temp_dict)
+                    temp_dict = {}
+            else:
+                # this is for weights
+                temp_dict['layer_name'] = layer_name_and_type[0]
+                temp_dict['epoch'] = epoch
+                temp_dict['iteration'] = _iter
+
+                if config['log_weights']:
+                    temp_dict = self.log_weights_biases_gradients(temp_dict, layer_name_and_type, layer_params)
+                if config['log_activations']:
+                    temp_dict = self.log_activations(temp_dict)
+
+
+    # ========================== Main methods ==============================================================================
 
     def set_train_and_test_model(self):
         self.set_logger()
@@ -199,10 +312,9 @@ class PytorchModel:
         if cuda_available:
             if torch.cuda.device_count() > 1:
                 print("Let's use", torch.cuda.device_count(), "GPUs!")
-                # dim = 0 [30, xxx] -> [10, ...], [10, ...], [10, ...] on 3 GPUs
                 self.model = nn.DataParallel(self.model)
             self.model.to(device)
-            self.logger.info('model parameters are cuda ? ' + str(next(self.model.parameters()).is_cuda))
+            self.logger.debug('model parameters are cuda ? ' + str(next(self.model.parameters()).is_cuda))
 
         # Train and then test the model
         num_of_train_epochs = self.train_model(train_loader, validate_loader)
@@ -212,12 +324,12 @@ class PytorchModel:
 
     def train_model(self, train_loader, valid_loader):
         criterion = nn.CrossEntropyLoss().cuda()
-        optimizer = optim.Adam(self.model.parameters(), lr=1e-3)
+        optimizer = optim.Adam(self.model.parameters())
 
         # Set hooks to get layers activations values
         self.set_model_activation_output()
 
-        self.logger.info('Start training for model {}\nModel Summary\n{}'.format(self.model_id, self.model))
+        self.logger.debug('Start training for model {}\nModel Summary\n{}'.format(self.model_id, self.model))
         logging_rate = config['logging_rate_initial']
         prev_valid_loss = float('inf')
         max_num_of_epochs = config['max_num_of_epochs']
@@ -259,34 +371,10 @@ class PytorchModel:
                 batch_correctly_labeled = (predicted == labels).sum().item()
                 epoch_correctly_labeled += batch_correctly_labeled
 
-                # logging the network stats according to the logging rate
                 if _iter % logging_rate == 0:
-                    self.logger.info('Training stats ========= Epoch {}/{} ========= Iteration {}/{} ========= '
-                                     'Batch Accuracy {} ========= loss {} ========='.
-                                     format(epoch + 1, max_num_of_epochs, _iter, len(train_loader),
-                                            batch_correctly_labeled / config['batch_size'],
-                                            running_loss / logging_rate))
-
+                    self.log_training_info(epoch, max_num_of_epochs, _iter,
+                                           train_loader, batch_correctly_labeled, running_loss, logging_rate)
                     running_loss = 0.0
-
-                    # Layers weights, biases and gradients to log
-                    print('Started logging weights|biases|gradients'.format())
-                    weight_strt = time.time()
-                    for layer_name, layer_params in self.model.named_parameters():
-                        self.logger.debug('layer_name {},\nlayer_shape {}\nvalues {} \ngradient_values {}'.
-                                     format(layer_name, list(layer_params.size()), layer_params.data, layer_params.grad))
-                    print('Finished logging weights|biases|gradients - time it took was {}Sec\n'.
-                          format(round(time.time()-weight_strt)))
-
-                    # TODO - put activation logging back in in the future
-                    # Layers activations values to log
-                    # logger.debug('All layers activations values:\n')
-                    # print('Started logging activations'.format(time.time()))
-                    # activ_strt = time.time()
-                    # for layer_name, layer_activation in activations.items():
-                    #     logger.debug('layer_name {}\nactivation_values {}'.
-                    #                  format(layer_name, layer_activation.data))
-                    # print('Finished logging activations - time it took was {}'.format(time.time()-activ_strt))
 
             self.logger.info('Epoch {} Accuracy is {}'.format(epoch + 1, epoch_correctly_labeled / epoch_total_labeled))
 
@@ -296,8 +384,10 @@ class PytorchModel:
                 break
 
         self.logger.info('Finished Training')
+        self.training_info_df.to_csv(self.save_path + 'model-' + str(self.model_id) + '.csv', index=False)
         self.save_pytorch_model(optimizer, loss, num_of_train_epochs)
         return num_of_train_epochs
+
 
     def validate_model(self, epoch, prev_loss, valid_loader):
         accuracy, curr_loss = self.test_model(data_loader=valid_loader, validation_flag=True)

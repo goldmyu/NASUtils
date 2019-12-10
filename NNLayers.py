@@ -20,8 +20,8 @@ class InputLayer(Layer):
         self.shape_width = shape_width
 
     def __str__(self):
-        return f'{{layer_type: \'InputLayer\', shape_height:\'{self.shape_height}\', ' \
-            f'shape_width: \'{self.shape_width}\',name:\'{self.name}\'}}'
+        return f'{{\"layer_type\": \"InputLayer\" , \"shape_height\": \"{self.shape_height}\", ' \
+            f'\"shape_width\": \"{self.shape_width}\" ,\"name\" : \"{self.name}\"}}'
 
 
 # TODO - what does this layer do?
@@ -30,7 +30,7 @@ class SqueezeLayer(Layer):
         Layer.__init__(self, name)
 
     def __str__(self):
-        return f'{{layer_type: \'SqueezeLayer\',name:\'{self.name}\'}}'
+        return f'{{ \"layer_type\" : \"SqueezeLayer\" , \"name\" : \"{self.name}\" }}'
 
 
 class DropoutLayer(Layer):
@@ -41,7 +41,7 @@ class DropoutLayer(Layer):
         self.rate = rate
 
     def __str__(self):
-        return f'{{layer_type: \'DropoutLayer\',rate:\'{self.rate}\', name:\'{self.name}\'}}'
+        return f'{{\"layer_type\": \"DropoutLayer\" , \"rate\" : \"{self.rate}\" , \"name\" : \"{self.name}\" }}'
 
 
 class BatchNormLayer(Layer):
@@ -52,8 +52,8 @@ class BatchNormLayer(Layer):
         self.epsilon = epsilon
 
     def __str__(self):
-        return f'{{layer_type: \'BatchNormLayer\', axis:\'{self.axis}\', ' \
-            f'momentum: \'{self.momentum}\', epsilon: \'{self.epsilon}\',name:\'{self.name}\'}}'
+        return f'{{\"layer_type\": \"BatchNormLayer\", \"axis\" : \"{self.axis}\", ' \
+            f'\"momentum\": \"{self.momentum}\" , \"epsilon\": \"{self.epsilon}\" ,\"name\" :\"{self.name}\"}}'
 
 
 class ActivationLayer(Layer):
@@ -62,7 +62,8 @@ class ActivationLayer(Layer):
         self.activation_type = activation_type
 
     def __str__(self):
-        return f'{{layer_type: \'ActivationLayer\', activation_type:\'{self.activation_type}\', name:\'{self.name}\'}}'
+        return f'{{\"layer_type\": \"ActivationLayer\", ' \
+            f'\"activation_type\" : \"{self.activation_type}\", \"name\" :\"{self.name}\"}}'
 
 
 class LinearLayer(Layer):
@@ -74,7 +75,7 @@ class LinearLayer(Layer):
         self.output_dim = output_dim
 
     def __str__(self):
-        return f'{{layer_type: \'LinearLayer\', output_dim:\'{self.output_dim}\', name:\'{self.name}\'}}'
+        return f'{{\"layer_type\": \"LinearLayer\", \"output_dim\" :\"{self.output_dim}\", \"name\" :\"{self.name}\"}}'
 
 
 # TODO - do we add support for 'dilation' and 'padding' for a conv layer?
@@ -96,8 +97,8 @@ class ConvLayer(Layer):
         self.stride = stride
 
     def __str__(self):
-        return f'{{layer_type: \'ConvLayer\', height:\'{self.height}\', width:\'{self.width}\', ' \
-            f'channels:\'{self.channels}\',stride:\'{self.stride}\', name:\'{self.name}\'}}'
+        return f'{{\"layer_type\": \"ConvLayer\", \"height\":\"{self.height}\", \"width\":\"{self.width}\", ' \
+            f'\"channels\":\"{self.channels}\",\"stride\":\"{self.stride}\", \"name\":\"{self.name}\"}}'
 
 
 class PoolingLayer(Layer):
@@ -116,8 +117,8 @@ class PoolingLayer(Layer):
         self.mode = mode
 
     def __str__(self):
-        return f'{{layer_type: \'PoolingLayer\', height:\'{self.height}\', width:\'{self.width}\', ' \
-            f'stride:\'{self.stride}\', mode:\'{self.mode}\' , name:\'{self.name}\'}}'
+        return f'{{\"layer_type\": \"PoolingLayer\", \"height\":\"{self.height}\", \"width\":\"{self.width}\", ' \
+            f'\"stride\":\"{self.stride}\", \"mode\":\"{self.mode}\" , \"name\":\"{self.name}\"}}'
 
 
 class IdentityLayer(Layer):
@@ -125,7 +126,7 @@ class IdentityLayer(Layer):
         Layer.__init__(self, name)
 
     def __str__(self):
-        return f'{{layer_type: \'IdentityLayer\',name:\'{self.name}\'}}'
+        return f'{{\"layer_type\": \"IdentityLayer\",\"name\":\"{self.name}\"}}'
 
 
 class ZeroPadLayer(Layer):
@@ -137,9 +138,9 @@ class ZeroPadLayer(Layer):
         self.width_pad_right = width_pad_right
 
     def __str__(self):
-        return f'{{layer_type: \'ZeroPadLayer\', height_pad_top:\'{self.height_pad_top}\', ' \
-            f'height_pad_bottom:\'{self.height_pad_bottom}\', width_pad_left:\'{self.width_pad_left}\', ' \
-            f'width_pad_right:\'{self.width_pad_right}\', name:\'{self.name}\'}}'
+        return f'{{\"layer_type\": \"ZeroPadLayer\", \"height_pad_top\":\"{self.height_pad_top}\", ' \
+            f'\"height_pad_bottom\":\"{self.height_pad_bottom}\", \"width_pad_left\":\"{self.width_pad_left}\", ' \
+            f'\"width_pad_right\":\"{self.width_pad_right}\", \"name\":\"{self.name}\"}}'
 
 
 class ConcatLayer(Layer):
@@ -149,8 +150,8 @@ class ConcatLayer(Layer):
         self.second_layer_index = second_layer_index
 
     def __str__(self):
-        return f'{{layer_type: \'ConcatLayer\', first_layer_index:\'{self.first_layer_index}\', ' \
-            f'second_layer_index:\'{self.second_layer_index}\', name:\'{self.name}\'}}'
+        return f'{{\"layer_type\": \"ConcatLayer\", \"first_layer_index\":\"{self.first_layer_index}\", ' \
+            f'\"second_layer_index\":\"{self.second_layer_index}\", \"name\":\"{self.name}\"}}'
 
 
 # TODO - what does this layer do?!?!
