@@ -112,16 +112,12 @@ class PytorchModel:
         return hook
 
     def set_model_activation_output(self):
-        if cuda_available:
-            for name, _layer in self.model._modules.items():
-                self.logger.info("get_activations name : {}\nself.model._modules {}".format(name, self.model._modules.module))
+        if isinstance(self.model, nn.DataParallel):
+            for name, _layer in self.model.module._modules.items():
                 _layer.register_forward_hook(self.get_activation(name))
         else:
             for name, _layer in self.model._modules.items():
-                self.logger.info("get_activations name : {}\nself.model._modules {}".format(name, self.model._modules))
                 _layer.register_forward_hook(self.get_activation(name))
-
-
 
     def save_pytorch_model(self, optimizer, loss, epoch):
         # TODO - save pytorch model checkpoint
@@ -181,7 +177,6 @@ class PytorchModel:
 
     def log_activations(self, _temp_dict):
         for layer_name_act, layer_activation in self.activations.items():
-            self.logger.info('activation {}'.format(layer_name_act))
             if layer_name_act == _temp_dict['layer_name']:
                 # TODO - check 'goodness of fit' test against Unifrom, Normal, logNormal distributions
                 _temp_dict['activation_max'] = torch.max(layer_activation).item()
@@ -417,3 +412,4 @@ class PytorchModel:
     #         x = F.relu(self.fc2(x))
     #         x = self.fc3(x)
     #         return x
+

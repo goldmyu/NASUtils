@@ -32,7 +32,7 @@ def main():
                         min_num_of_epochs=5,
                         validation_size=0.2,
                         logging_rate_initial=10,
-                        models_save_path='generated_files/experiment_6/',
+                        models_save_path='../generated_files/experiment_6/',
                         log_weights=True,
                         log_activations=True)
 
@@ -43,7 +43,6 @@ def main():
         pytorch_model = PytorchModel(model=model, model_id=model_id, model_num=model_num)
         model_test_accuracy, num_of_train_epochs = pytorch_model.set_train_and_test_model()
         save_abstract_model_to_csv(abstract_model, model_id, model_test_accuracy, num_of_train_epochs)
-
 
 
 if __name__ == "__main__":
