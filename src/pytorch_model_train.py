@@ -55,7 +55,7 @@ class PytorchModel:
                                                       'activation_var', 'activation_std',
                                                       'iteration', 'epoch'])
 
-    # ========================== Helper methods ============================================================================
+    # ========================== Helper methods ========================================================================
 
     def set_logger(self):
         if not os.path.exists(self.save_path):
@@ -112,8 +112,16 @@ class PytorchModel:
         return hook
 
     def set_model_activation_output(self):
-        for name, _layer in self.model._modules.items():
-            _layer.register_forward_hook(self.get_activation(name))
+        if cuda_available:
+            for name, _layer in self.model._modules.items():
+                self.logger.info("get_activations name : {}\nself.model._modules {}".format(name, self.model._modules.module))
+                _layer.register_forward_hook(self.get_activation(name))
+        else:
+            for name, _layer in self.model._modules.items():
+                self.logger.info("get_activations name : {}\nself.model._modules {}".format(name, self.model._modules))
+                _layer.register_forward_hook(self.get_activation(name))
+
+
 
     def save_pytorch_model(self, optimizer, loss, epoch):
         # TODO - save pytorch model checkpoint
@@ -173,6 +181,7 @@ class PytorchModel:
 
     def log_activations(self, _temp_dict):
         for layer_name_act, layer_activation in self.activations.items():
+            self.logger.info('activation {}'.format(layer_name_act))
             if layer_name_act == _temp_dict['layer_name']:
                 # TODO - check 'goodness of fit' test against Unifrom, Normal, logNormal distributions
                 _temp_dict['activation_max'] = torch.max(layer_activation).item()
@@ -198,6 +207,9 @@ class PytorchModel:
         for layer_name, layer_params in self.model.named_parameters():
             layer_name_and_type = layer_name.split('.')
 
+            if layer_name_and_type[0] == 'module':
+                layer_name_and_type = layer_name_and_type[1:]
+
             if 'layer_name' in temp_dict.keys():
                 # This is for bias
                 if config['log_weights']:
@@ -215,7 +227,7 @@ class PytorchModel:
                 if config['log_activations']:
                     temp_dict = self.log_activations(temp_dict)
 
-# ========================== Main methods ==============================================================================
+    # ========================== Main methods ==========================================================================
 
     def set_train_and_test_model(self):
         self.set_logger()
@@ -234,10 +246,10 @@ class PytorchModel:
             normalize,
         ])
 
-        trainset = torchvision.datasets.CIFAR10(root='./data-sets/cifar10', train=True,
+        trainset = torchvision.datasets.CIFAR10(root='../data-sets/cifar10', train=True,
                                                 download=True, transform=transform)
 
-        testset = torchvision.datasets.CIFAR10(root='./data-sets/cifar10', train=False,
+        testset = torchvision.datasets.CIFAR10(root='../data-sets/cifar10', train=False,
                                                download=True, transform=transform)
 
         num_train = len(trainset)
