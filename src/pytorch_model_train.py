@@ -15,7 +15,7 @@ from config import config
 import logging
 import logging.handlers
 
-# ============================= General Settings =======================================================================
+# region ============================= General Settings ================================================================
 
 cuda_available = torch.cuda.is_available()
 device = torch.device("cuda:0" if cuda_available else "cpu")
@@ -28,6 +28,8 @@ if cuda_available:
 np.set_printoptions(threshold=sys.maxsize)
 torch.set_printoptions(threshold=sys.maxsize)
 
+
+# endregion
 
 class InfoFilter(logging.Filter):
     def filter(self, rec):
@@ -55,7 +57,7 @@ class PytorchModel:
                                                       'activation_var', 'activation_std',
                                                       'iteration', 'epoch'])
 
-    # ========================== Helper methods ========================================================================
+    # region ========================== Helper methods =================================================================
 
     def set_logger(self):
         if not os.path.exists(self.save_path):
@@ -98,7 +100,6 @@ class PytorchModel:
 
     def write_model_summery(self, train_loader):
         writer = SummaryWriter(self.save_path)
-
         images, labels = next(iter(train_loader))
         grid = torchvision.utils.make_grid(images)
         writer.add_image('images', grid)
@@ -222,7 +223,9 @@ class PytorchModel:
                 if config['log_activations']:
                     temp_dict = self.log_activations(temp_dict)
 
-    # ========================== Main methods ==========================================================================
+    # endregion
+
+    # region ========================== Main methods ===================================================================
 
     def set_train_and_test_model(self):
         self.set_logger()
@@ -389,27 +392,4 @@ class PytorchModel:
         else:
             self.logger.info('Test set accuracy is {}'.format(model_accuracy))
             return model_accuracy
-
-    # class Net(nn.Module):
-    #     def __init__(self):
-    #         super(Net, self).__init__()
-    #         self.conv1 = nn.Conv2d(3, 6, 5)
-    #         self.batch_nrm1 = nn.BatchNorm2d(6)
-    #         self.conv2 = nn.Conv2d(6, 16, 5)
-    #         self.batch_nrm2 = nn.BatchNorm2d(16)
-    #         self.pool = nn.MaxPool2d(2, 2)
-    #
-    #         self.fc1 = nn.Linear(16 * 5 * 5, 120)
-    #         self.fc2 = nn.Linear(120, 84)
-    #         self.fc3 = nn.Linear(84, 10)
-    #
-    #     def forward(self, x):
-    #         x = self.pool(self.batch_nrm1(F.relu(self.conv1(x))))
-    #         x = self.pool(self.batch_nrm2(F.relu(self.conv2(x))))
-    #
-    #         x = x.view(-1, 16 * 5 * 5)
-    #         x = F.relu(self.fc1(x))
-    #         x = F.relu(self.fc2(x))
-    #         x = self.fc3(x)
-    #         return x
-
+    # endregion
