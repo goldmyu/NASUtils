@@ -32,7 +32,7 @@ def main():
                         min_num_of_epochs=5,
                         validation_size=0.2,
                         logging_rate_initial=10,
-                        models_save_path='../generated_files/experiment_6/',
+                        models_save_path='../generated_files/experiment_test/',
                         log_weights=True,
                         log_activations=True)
 

@@ -11,11 +11,13 @@ import pandas as pd
 from torch.utils.data.sampler import SubsetRandomSampler
 from torch.utils.tensorboard import SummaryWriter
 
+
 from config import config
 import logging
 import logging.handlers
 
 # region ============================= General Settings ================================================================
+torch.multiprocessing.set_sharing_strategy('file_system')
 
 cuda_available = torch.cuda.is_available()
 device = torch.device("cuda:0" if cuda_available else "cpu")

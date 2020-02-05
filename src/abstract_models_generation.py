@@ -22,16 +22,22 @@ def print_model_structure(structure):
 
 # ================================= Models Creation ====================================================================
 
-def random_model(max_network_depth, attempets_num):
+def random_model(max_network_depth, attempts_num):
     layer_collection = []
     prev_layer = None
+    network_depth_budget = random.randint(1, max_network_depth)
+
     for i in range(max_network_depth):
-        prev_layer = random_layer(prev_layer)
-        layer_collection.append(prev_layer)
+        if i < network_depth_budget:
+            prev_layer = random_layer(prev_layer)
+            layer_collection.append(prev_layer)
+        else:
+            layer_collection.append(IdentityLayer)
+
     if check_legal_model(layer_collection):
-        return layer_collection, attempets_num
+        return layer_collection, attempts_num
     else:
-        return random_model(max_network_depth, attempets_num + 1)
+        return random_model(max_network_depth, attempts_num + 1)
 
 
 def random_layer(prev_layer):
@@ -154,7 +160,7 @@ def get_model_true_depth(model):
 
 def generate_abstract_model():
     model_id = uuid.uuid4()
-    model, attemptes_num = random_model(config['max_network_depth'], attempets_num=0)
+    model, attemptes_num = random_model(config['max_network_depth'], attempts_num=0)
     model = finalize_model(model)
     print('Generated model {} number of attempts for creation was {}'.format(model_id, attemptes_num))
     return model_id, model
