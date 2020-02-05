@@ -2,6 +2,13 @@ import ast
 import json
 import pandas as pd
 
+list_of_keys = ['Layer_1', 'Layer_2', 'Layer_3', 'Layer_4', 'Layer_5', 'Layer_6', 'Layer_7'
+    , 'Layer_8', 'Layer_9', 'Layer_10', 'Layer_11', 'Layer_12', 'Layer_13', 'Layer_14'
+    , 'Layer_15', 'Layer_16', 'Layer_17', 'Layer_18', 'Layer_19', 'Layer_20', 'Layer_21',
+                'Layer_22', 'model_test_accuracy']
+
+layer_type_enumerate = {'ConvLayer': 1, 'BatchNormLayer': 2}
+
 
 # region ============================= Util Methods ====================================================================
 
@@ -10,41 +17,46 @@ def load_model_training_data(data_folder, model_id):
     return model_df
 
 
-def fix_models_to_json(models):
-    for model_index, model in enumerate(models):
-        layers_list = ast.literal_eval(model)
-        for index, layer_str in enumerate(layers_list):
-            fixed_layer_str = fix_string_for_json(layer_str)
-            test_layer_to_json(fixed_layer_str)
-            layers_list[index] = fixed_layer_str
-            # print(layer_str)
-        # print(str(layers_list))
-        model = str(layers_list)
-        models[model_index] = model
-    return models
+def model_layers_str_to_dict(model_layers_str):
+    layers_dict = dict.fromkeys(list_of_keys)
+    layers_list = ast.literal_eval(model_layers_str)
+    for index, layer_str in enumerate(layers_list):
+        fixed_layer_str = test_and_fix_string_for_json(layer_str)
+        layers_list[index] = fixed_layer_str
+        json_layer = json.loads(fixed_layer_str)
+        layers_dict['Layer_' + str(index + 1)] = json_layer
+        # print(layer_str)
+    # print(str(layers_list))
+    # model = str(layers_list)
+    return layers_dict
 
 
-def fix_string_for_json(_layer_str):
-    _layer_str = _layer_str.replace("\'", "\"")
-    _layer_str = _layer_str.replace("layer_type", "\"layer_type\"")
-    _layer_str = _layer_str.replace("rate", "\"rate\"")
-    _layer_str = _layer_str.replace("name", "\"name\"")
-    _layer_str = _layer_str.replace("axis", "\"axis\"")
-    _layer_str = _layer_str.replace("height", "\"height\"")
-    _layer_str = _layer_str.replace("width", "\"width\"")
-    _layer_str = _layer_str.replace("channels", "\"channels\"")
-    _layer_str = _layer_str.replace("stride", "\"stride\"")
-    _layer_str = _layer_str.replace("mode", "\"mode\"")
-    _layer_str = _layer_str.replace("momentum", "\"momentum\"")
-    _layer_str = _layer_str.replace("epsilon", "\"epsilon\"")
-    _layer_str = _layer_str.replace("activation_type", "\"activation_type\"")
-    _layer_str = _layer_str.replace("output_dim", "\"output_dim\"")
-    return _layer_str
+def test_and_fix_string_for_json(_layer_str):
+    try:
+        if test_layer_to_json(_layer_str):
+            return _layer_str
+    except Exception as e:
+        _layer_str = _layer_str.replace("\'", "\"")
+        _layer_str = _layer_str.replace("layer_type", "\"layer_type\"")
+        _layer_str = _layer_str.replace("rate", "\"rate\"")
+        _layer_str = _layer_str.replace("name", "\"name\"")
+        _layer_str = _layer_str.replace("axis", "\"axis\"")
+        _layer_str = _layer_str.replace("height", "\"height\"")
+        _layer_str = _layer_str.replace("width", "\"width\"")
+        _layer_str = _layer_str.replace("channels", "\"channels\"")
+        _layer_str = _layer_str.replace("stride", "\"stride\"")
+        _layer_str = _layer_str.replace("mode", "\"mode\"")
+        _layer_str = _layer_str.replace("momentum", "\"momentum\"")
+        _layer_str = _layer_str.replace("epsilon", "\"epsilon\"")
+        _layer_str = _layer_str.replace("activation_type", "\"activation_type\"")
+        _layer_str = _layer_str.replace("output_dim", "\"output_dim\"")
+        return _layer_str
 
 
 def test_layer_to_json(_fixed_layer_str):
     try:
         json.loads(_fixed_layer_str)
+        return True
     except Exception as e:
         print("This string {} cannot be converted to JSON\n Error was {}".format(_fixed_layer_str, e))
         raise e
