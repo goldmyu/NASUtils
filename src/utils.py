@@ -5,9 +5,10 @@ import pandas as pd
 list_of_keys = ['Layer_1', 'Layer_2', 'Layer_3', 'Layer_4', 'Layer_5', 'Layer_6', 'Layer_7'
     , 'Layer_8', 'Layer_9', 'Layer_10', 'Layer_11', 'Layer_12', 'Layer_13', 'Layer_14'
     , 'Layer_15', 'Layer_16', 'Layer_17', 'Layer_18', 'Layer_19', 'Layer_20', 'Layer_21',
-                'Layer_22', 'model_test_accuracy']
+                'Layer_22']
 
-layer_type_enumerate = {'ConvLayer': 1, 'BatchNormLayer': 2}
+layer_type_enumerate = {'IdentityLayer': 0, 'ConvLayer': 1, 'BatchNormLayer': 2, 'DropoutLayer': 3, 'PoolingLayer': 4,
+                        'ActivationLayer': 5, 'LinearLayer': 6}
 
 
 # region ============================= Util Methods ====================================================================
@@ -25,9 +26,6 @@ def model_layers_str_to_dict(model_layers_str):
         layers_list[index] = fixed_layer_str
         json_layer = json.loads(fixed_layer_str)
         layers_dict['Layer_' + str(index + 1)] = json_layer
-        # print(layer_str)
-    # print(str(layers_list))
-    # model = str(layers_list)
     return layers_dict
 
 
