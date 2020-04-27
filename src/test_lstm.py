@@ -1,6 +1,6 @@
 import torch
-import torch.nn.functional as F
 import torch.utils.data as Data
+import torch.nn.functional as F
 import torchvision.transforms as transforms
 
 import pandas as pd
@@ -14,14 +14,21 @@ print("CUDA available ? {}\nCUDA device is:{}".format(cuda_available, device))
 
 # =========================================== Hyper-params =============================================================
 
+# Generated data size
+train_size = 10000
+test_size = 100
+
+# LSTM Hyper-params
+lstm_num_layers = 5
 input_dim = 1  # number of features
 hidden_dim = 1  # number of features in the hidden states
-lstm_num_layers = 3
-batch_size = 50
-learning_rate = 1
-num_of_epochs = 1000
-sequence_length = 5
+sequence_length = 5  # input sequence length
 
+# training Hyper-params
+train_batch_size = 100
+test_batch_size = 1
+learning_rate = 1
+num_of_epochs = 100
 
 # =========================================== Define the model =========================================================
 
@@ -94,7 +101,7 @@ def model_train(_lstm_model, _num_of_epochs, _data_loader, _optimizer):
             sequence_pred_label = _lstm_model(data_batch)
 
             # Compute the loss, gradients, and update the parameters
-            loss = loss_function(sequence_pred_label.view(-1), labels)
+            loss = loss_function(sequence_pred_label.squeeze(), labels)
             epoch_loss += loss
 
             # iteration += 1
@@ -104,23 +111,23 @@ def model_train(_lstm_model, _num_of_epochs, _data_loader, _optimizer):
             loss.backward()
             _optimizer.step()
 
-        if epoch_loss < 1:
+        if epoch_loss < 0.27:
             print("model training is done, switching to testing the model...")
-            break;
+            break
         print("Training Epoch number ", i, " the epoch loss is : ", epoch_loss.item())
 
 
-def model_test(_lstm_model, test_set):
+def model_test(_lstm_model, _test_set):
     test_loss = 0
-    for data, labels in test_set:
+    for data, labels in _test_set:
         sequence_pred_label = _lstm_model(data)
         loss = loss_function(sequence_pred_label, labels)
         test_loss += loss
         print("Model_Test - input sequence was {} predicted next number is {}".
-              format(data[0].values, sequence_pred_label[0].item()))
+              format(data[0], sequence_pred_label[0].item()))
 
-    avg_loss = test_loss / test_set.shape[0]
-    print("Model test avarage loss was {}".format(avg_loss))
+    avg_loss = test_loss / len(_test_set.dataset)
+    print("Model test avarage loss was {}".format(avg_loss.item()))
 
 
 # =========================================== Create the data -=========================================================
@@ -129,7 +136,7 @@ generated_data_sequence = [i / float(100) for i in range(100)]
 
 # train data-set
 train_set = pd.DataFrame(columns=['t1', 't2', 't3', 't4', 't5', 'sequence_label'])
-for i in range(1000):
+for i in range(train_size):
     rand_index = random.randint(0, len(generated_data_sequence) - sequence_length - 1)
     temp_sequence = generated_data_sequence[rand_index: rand_index + sequence_length]
     temp_sequence_label = generated_data_sequence[rand_index + sequence_length]
@@ -143,7 +150,7 @@ for i in range(1000):
 
 # test data-set
 test_set = pd.DataFrame(columns=['t1', 't2', 't3', 't4', 't5', 'sequence_label'])
-for i in range(100):
+for i in range(test_size):
     rand_index = random.randint(0, len(generated_data_sequence) - sequence_length - 1)
     temp_sequence = generated_data_sequence[rand_index: rand_index + sequence_length]
     temp_sequence_label = generated_data_sequence[rand_index + sequence_length]
@@ -160,10 +167,10 @@ for i in range(100):
 
 # data_transform = transforms.Lambda(lambda x: listToTensor(x))
 train_dataset = DatasetLSTM(dataset=train_set, sequence_length=sequence_length, transforms=None)
-train_data_loader = Data.DataLoader(train_dataset, batch_size=batch_size, shuffle=False, num_workers=1)
+train_data_loader = Data.DataLoader(train_dataset, batch_size=train_batch_size, shuffle=False, num_workers=0)
 
 test_dataset = DatasetLSTM(dataset=test_set, sequence_length=sequence_length, transforms=None)
-test_data_loader = Data.DataLoader(test_dataset, batch_size=batch_size, shuffle=False, num_workers=1)
+test_data_loader = Data.DataLoader(test_dataset, batch_size=test_batch_size, shuffle=False, num_workers=0)
 
 lstm_model = LSTM_model(input_dim, hidden_dim, lstm_num_layers, device).to(device)
 optimizer = torch.optim.Adadelta(params=lstm_model.parameters(), lr=learning_rate)

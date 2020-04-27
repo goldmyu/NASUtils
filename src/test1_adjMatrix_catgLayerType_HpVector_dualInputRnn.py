@@ -2,7 +2,6 @@ import pandas as pd
 import utils
 import numpy as np
 import torch
-import torch.nn as nn
 
 
 # region ================================ Experiment description =======================================================
@@ -79,19 +78,19 @@ epoch = 0
 sub = model_training_data_df[
     (model_training_data_df['iteration'] == iteration) & (model_training_data_df['epoch'] == epoch)]
 
-# remove layer_name coloumn and iteration & epoch coloumns
+# remove layer_name column and iteration & epoch columns
 sub_only_data = sub.drop(['layer_name','iteration','epoch'], axis=1)
 
 vector_sub_only_data = sub_only_data.values.flatten()
 # endregion
 # region ==================== Create training data-set for RNN =========================================================
 
-# Create large vector for all HP and initalize to zeros - size 25x22=550 - 25 hp types and 22 layers
+# Create large vector for all HP and initialize to zeros - size 25x22=550 - 25 hp types and 22 layers
 hp_vector = np.zeros(550)
 
 # Iterate over layer_dict and compare each layer name to the layer in the training data base.
 # If it is the same layer - insert hp into hp_vector, else skip 25 indexes leaving zeros.
-for layer_nunber, layer in model_layers_dict.items():
+for layer_number, layer in model_layers_dict.items():
     print(layer)
 
 
@@ -106,7 +105,7 @@ hidden_dim = 10
 n_layers = 1
 batch_size = 1
 seq_len = 1
-lstm_layer = nn.LSTM(input_dim, hidden_dim, n_layers, batch_first=True)
+lstm_layer = torch.nn.LSTM(input_dim, hidden_dim, n_layers, batch_first=True)
 inp = torch.randn(batch_size, seq_len, input_dim)
 hidden_state = torch.randn(n_layers, batch_size, hidden_dim)
 cell_state = torch.randn(n_layers, batch_size, hidden_dim)

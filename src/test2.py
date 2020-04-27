@@ -15,7 +15,7 @@ from sklearn.metrics import mean_squared_error
 
 # load CSV file
 experiment_name = 'experiment_4_simple'
-file_path = './generated_files/' + experiment_name + '/'
+file_path = '../generated_files/' + experiment_name + '/'
 models_df = pd.read_csv(file_path + 'experiment_4_simple_extracted_data_numerical.csv')
 
 # remove layers 21,22
@@ -38,7 +38,7 @@ print(mean_squared_error(y_test, pred))
 
 
 test['pred']=pred
-test.to_csv('generated_files/experiment_4_simple/test.csv', index=False)
+test.to_csv('../generated_files/experiment_4_simple/test.csv', index=False)
 
 print(test)
 
