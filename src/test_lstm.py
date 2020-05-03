@@ -1,4 +1,5 @@
 import torch
+import torchvision
 import torch.utils.data as Data
 import torch.nn.functional as F
 import torchvision.transforms as transforms
@@ -8,21 +9,27 @@ import random
 
 torch.manual_seed(1)
 
+print('torch version {}\ntorchvision version {}'.format(torch.__version__, torchvision.__version__))
+
+# GPU and CUDA support check
 cuda_available = torch.cuda.is_available()
 device = torch.device("cuda:0" if cuda_available else "cpu")
-print("CUDA available ? {}\nCUDA device is:{}".format(cuda_available, device))
+print("CUDA available ? {} CUDA device is:{}".format(cuda_available, device))
+if cuda_available:
+    print('Number of available CUDA devices {}'.format(torch.cuda.device_count()))
 
 # =========================================== Hyper-params =============================================================
+
+
+# LSTM Hyper-params
+lstm_num_layers = 2
+input_dim = 1  # number of features
+hidden_dim = 1  # number of features in the hidden states
+sequence_length = 5  # input sequence length
 
 # Generated data size
 train_size = 10000
 test_size = 100
-
-# LSTM Hyper-params
-lstm_num_layers = 5
-input_dim = 1  # number of features
-hidden_dim = 1  # number of features in the hidden states
-sequence_length = 5  # input sequence length
 
 # training Hyper-params
 train_batch_size = 100
@@ -63,10 +70,10 @@ class DatasetLSTM(Data.Dataset):
     """
 
     #  Constructor
-    def __init__(self, dataset, sequence_length, transforms=None):
+    def __init__(self, dataset, _sequence_length, _transforms=None):
         self.dataset = dataset
-        self.seq_length = sequence_length
-        self.transforms = transforms
+        self.seq_length = _sequence_length
+        self.transforms = _transforms
 
     # Override total dataset's length getter
     def __len__(self):
@@ -75,14 +82,10 @@ class DatasetLSTM(Data.Dataset):
     # Override single items' getter
     def __getitem__(self, idx):
         seq_list = self.dataset.iloc[idx]
-
-        _data = torch.empty(sequence_length, 1).to(device)
+        _data = torch.empty(sequence_length, 1)
         for _iter in range(sequence_length):
             _data[_iter, :] = torch.Tensor([seq_list[_iter]])
-        # _data = _data.view(1, -1).to(device)
-        # _data = torch.FloatTensor()
-
-        label = torch.as_tensor(seq_list[-1]).to(device)
+        label = torch.as_tensor(seq_list[-1])
         return _data, label
 
 
@@ -90,12 +93,15 @@ class DatasetLSTM(Data.Dataset):
 
 
 def model_train(_lstm_model, _num_of_epochs, _data_loader, _optimizer):
-    for i in range(_num_of_epochs):
+    for epoch in range(_num_of_epochs):
         epoch_loss = 0
-        iteration=0
-        for data_batch, labels in _data_loader:
+        for step, (data_batch, labels) in enumerate(_data_loader):
             # We need to clear them out before each instance
             _lstm_model.zero_grad()
+
+            # for CUDA
+            data_batch = data_batch.to(device)
+            labels = labels.to(device)
 
             # Run our forward pass
             sequence_pred_label = _lstm_model(data_batch)
@@ -104,9 +110,8 @@ def model_train(_lstm_model, _num_of_epochs, _data_loader, _optimizer):
             loss = loss_function(sequence_pred_label.squeeze(), labels)
             epoch_loss += loss
 
-            # iteration += 1
-            # if iteration % 50 == 0:
-            #     print("Iteration {} loss is {}".format(iteration, loss.item()))
+            # if step % 50 == 0:
+            #     print("Iteration {} loss is {}".format(step, loss.item()))
 
             loss.backward()
             _optimizer.step()
@@ -114,12 +119,15 @@ def model_train(_lstm_model, _num_of_epochs, _data_loader, _optimizer):
         if epoch_loss < 0.27:
             print("model training is done, switching to testing the model...")
             break
-        print("Training Epoch number ", i, " the epoch loss is : ", epoch_loss.item())
+        print("Training Epoch number ", epoch, " the epoch loss is : ", epoch_loss.item())
 
 
 def model_test(_lstm_model, _test_set):
     test_loss = 0
     for data, labels in _test_set:
+        data = data.to(device)
+        labels = labels.to(device)
+
         sequence_pred_label = _lstm_model(data)
         loss = loss_function(sequence_pred_label, labels)
         test_loss += loss
@@ -166,11 +174,11 @@ for i in range(test_size):
 
 
 # data_transform = transforms.Lambda(lambda x: listToTensor(x))
-train_dataset = DatasetLSTM(dataset=train_set, sequence_length=sequence_length, transforms=None)
-train_data_loader = Data.DataLoader(train_dataset, batch_size=train_batch_size, shuffle=False, num_workers=0)
+train_dataset = DatasetLSTM(dataset=train_set, _sequence_length=sequence_length, _transforms=None)
+train_data_loader = Data.DataLoader(train_dataset, batch_size=train_batch_size, shuffle=False, num_workers=2)
 
-test_dataset = DatasetLSTM(dataset=test_set, sequence_length=sequence_length, transforms=None)
-test_data_loader = Data.DataLoader(test_dataset, batch_size=test_batch_size, shuffle=False, num_workers=0)
+test_dataset = DatasetLSTM(dataset=test_set, _sequence_length=sequence_length, _transforms=None)
+test_data_loader = Data.DataLoader(test_dataset, batch_size=test_batch_size, shuffle=False, num_workers=1)
 
 lstm_model = LSTM_model(input_dim, hidden_dim, lstm_num_layers, device).to(device)
 optimizer = torch.optim.Adadelta(params=lstm_model.parameters(), lr=learning_rate)
