@@ -2,6 +2,7 @@ import copy
 import json
 import os
 import uuid
+import json
 
 import pandas as pd
 
@@ -30,6 +31,8 @@ def random_model(max_network_depth, attempts_num):
     for i in range(max_network_depth):
         if i < network_depth_budget:
             prev_layer = random_layer(prev_layer)
+            layer_type = eval(str(prev_layer)).get("layer_type")
+            prev_layer.name = layer_type + '_' + str(i)
             layer_collection.append(prev_layer)
         else:
             layer_collection.append(IdentityLayer)

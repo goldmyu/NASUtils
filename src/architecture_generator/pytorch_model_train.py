@@ -12,7 +12,7 @@ from torch.utils.data.sampler import SubsetRandomSampler
 from torch.utils.tensorboard import SummaryWriter
 
 
-from config import config
+from architecture_generator.config import config
 import logging
 import logging.handlers
 
