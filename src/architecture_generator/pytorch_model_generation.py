@@ -1,8 +1,8 @@
 import torch
 from torch import nn
 import numpy as np
+from src.architecture_generator.NNLayers import *
 import config
-from NNLayers import *
 
 
 # ================================== Pytorch Code Genration ============================================================
@@ -11,7 +11,7 @@ from NNLayers import *
 def create_pytorch_model(layer_collection, model_id, apply_fix=False):
     model = nn.Sequential()
     activations_types = {'relu': nn.ReLU, 'elu': nn.ELU, 'softmax': nn.Softmax, 'sigmoid': nn.Sigmoid}
-    input_shape = (config['batch_size'], config['dataset_channels'], config['dataset_height'], config['dataset_width'])
+    input_shape = (config.batch_size, config.dataset_channels, config.dataset_height, config.dataset_width)
 
     for i in range(len(layer_collection)):
         layer = layer_collection[i]

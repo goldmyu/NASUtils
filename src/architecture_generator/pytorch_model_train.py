@@ -11,10 +11,11 @@ import pandas as pd
 from torch.utils.data.sampler import SubsetRandomSampler
 from torch.utils.tensorboard import SummaryWriter
 
-
-from architecture_generator.config import config
+# from architecture_generator.config import config
 import logging
 import logging.handlers
+
+import config
 
 # region ============================= General Settings ================================================================
 torch.multiprocessing.set_sharing_strategy('file_system')
@@ -25,7 +26,7 @@ device = torch.device("cuda:0" if cuda_available else "cpu")
 print('torch version {}\ntorchvision version {}'.format(torch.__version__, torchvision.__version__))
 print('CUDA available? {} Device is {}'.format(cuda_available, device))
 if cuda_available:
-    print('Number of available CUDA devices {}'.format(torch.cuda.device_count()))
+    print('Number of available CUDA devices {}\n'.format(torch.cuda.device_count()))
 
 np.set_printoptions(threshold=sys.maxsize)
 torch.set_printoptions(threshold=sys.maxsize)
@@ -43,7 +44,7 @@ class PytorchModel:
     def __init__(self, model, model_id, model_num):
         self.model = model
         self.model_id = model_id
-        self.save_path = config['models_save_path'] + "model-" + str(model_id) + "/"
+        self.save_path = config.models_save_path + "model-" + str(model_id) + "/"
         self.activations = {}
         self.logger = logging.getLogger('pytorch_' + str(model_num))
         self.training_info_df = pd.DataFrame(columns=['layer_name',
@@ -62,6 +63,9 @@ class PytorchModel:
     # region ========================== Helper methods =================================================================
 
     def set_logger(self):
+        dirname = os.path.dirname(__file__)
+        self.save_path = dirname + "/../.." + self.save_path
+
         if not os.path.exists(self.save_path):
             os.makedirs(self.save_path)
 
@@ -191,14 +195,10 @@ class PytorchModel:
         return _temp_dict
 
     def log_training_info(self, epoch, max_num_of_epochs, _iter,
-                          train_loader, batch_correctly_labeled, running_loss, logging_rate):
-
-        # logging the network stats according to the logging rate
-        self.logger.info('Training stats ========= Epoch {}/{} ========= Iteration {}/{} ========= '
-                         'Batch Accuracy {} ========= loss {} ========='.
-                         format(epoch + 1, max_num_of_epochs, _iter, len(train_loader),
-                                batch_correctly_labeled / config['batch_size'],
-                                running_loss / logging_rate))
+                          iter_per_epoch, batch_correctly_labeled, logging_rate,
+                          running_loss, train_epoch_accu, train_epoch_loss,
+                          val_loss, val_accu,
+                          at_epoch_end=False):
 
         temp_dict = {}
         # This happens for every layer in the model
@@ -210,7 +210,7 @@ class PytorchModel:
 
             if 'layer_name' in temp_dict.keys():
                 # This is for bias
-                if config['log_weights']:
+                if config.log_weights:
                     temp_dict = self.log_weights_biases_gradients(temp_dict, layer_name_and_type, layer_params)
                     self.training_info_df = self.training_info_df.append(temp_dict, ignore_index=True)
                     temp_dict = {}
@@ -219,10 +219,18 @@ class PytorchModel:
                 temp_dict['layer_name'] = layer_name_and_type[0]
                 temp_dict['epoch'] = epoch
                 temp_dict['iteration'] = _iter
+                temp_dict['val_accu'] = val_accu
+                temp_dict['val_loss'] = val_loss
+                temp_dict['train_epoch_accu'] = train_epoch_accu
+                temp_dict['train_epoch_loss'] = train_epoch_loss
+                if at_epoch_end:
+                    temp_dict['at_epoch_end'] = 1
+                else:
+                    temp_dict['at_epoch_end'] = 0
 
-                if config['log_weights']:
+                if config.log_weights:
                     temp_dict = self.log_weights_biases_gradients(temp_dict, layer_name_and_type, layer_params)
-                if config['log_activations']:
+                if config.log_activations:
                     temp_dict = self.log_activations(temp_dict)
 
     # endregion
@@ -232,7 +240,7 @@ class PytorchModel:
     def set_train_and_test_model(self):
         self.set_logger()
 
-        valid_size = config['validation_size']
+        valid_size = config.validation_size
         error_msg = "[!] valid_size should be in the range [0, 1]."
         assert ((valid_size >= 0) and (valid_size <= 1)), error_msg
 
@@ -246,10 +254,11 @@ class PytorchModel:
             normalize,
         ])
 
-        trainset = torchvision.datasets.CIFAR10(root='../data-sets/cifar10', train=True,
+        dir_name = os.path.dirname(__file__)
+        trainset = torchvision.datasets.CIFAR10(root=dir_name + '/../../data-sets/cifar10', train=True,
                                                 download=True, transform=transform)
 
-        testset = torchvision.datasets.CIFAR10(root='../data-sets/cifar10', train=False,
+        testset = torchvision.datasets.CIFAR10(root=dir_name + '/../../data-sets/cifar10', train=False,
                                                download=True, transform=transform)
 
         num_train = len(trainset)
@@ -263,15 +272,15 @@ class PytorchModel:
         train_sampler = SubsetRandomSampler(train_idx)
         valid_sampler = SubsetRandomSampler(valid_idx)
 
-        num_workers = config['num_of_dataloader_workers']
+        num_workers = config.num_of_dataloader_workers
 
-        train_loader = torch.utils.data.DataLoader(trainset, batch_size=config['batch_size'],
+        train_loader = torch.utils.data.DataLoader(trainset, batch_size=config.batch_size,
                                                    sampler=train_sampler, num_workers=num_workers, drop_last=True)
 
-        validate_loader = torch.utils.data.DataLoader(trainset, batch_size=config['batch_size'], sampler=valid_sampler,
+        validate_loader = torch.utils.data.DataLoader(trainset, batch_size=config.batch_size, sampler=valid_sampler,
                                                       num_workers=num_workers)
 
-        test_loader = torch.utils.data.DataLoader(testset, batch_size=config['batch_size'], num_workers=num_workers)
+        test_loader = torch.utils.data.DataLoader(testset, batch_size=config.batch_size, num_workers=num_workers)
 
         self.write_model_summery(train_loader)
 
@@ -296,24 +305,28 @@ class PytorchModel:
         self.set_model_activation_output()
 
         self.logger.debug('Start training for model {}\nModel Summary\n{}'.format(self.model_id, self.model))
-        logging_rate = config['logging_rate_initial']
+        logging_rate = config.logging_rate_initial
         prev_valid_loss = float('inf')
-        max_num_of_epochs = config['max_num_of_epochs']
+        max_num_of_epochs = config.max_num_of_epochs
         num_of_train_epochs = max_num_of_epochs
 
         for epoch in range(max_num_of_epochs):  # loop over the dataset multiple times
             logging_rate = logging_rate * (epoch + 1)
             running_loss = 0.0
+            train_epoch_loss = 0
             epoch_correctly_labeled = 0
             epoch_total_labeled = 0
+            iter_per_epoch = 0
+            batch_correctly_labeled = 0
 
-            self.logger.info('\nStarted training epoch {}/{}\n'
-                             'Logging rate every {} iterations'.format(epoch + 1,
-                                                                       max_num_of_epochs,
-                                                                       min(logging_rate, len(train_loader))))
+            self.logger.info('\nStarted training epoch {}/{}'.format(epoch + 1, max_num_of_epochs))
+
+            if not config.log_only_at_epoch_end:
+                self.logger.info('Logging rate every {} iterations'.format(min(logging_rate, len(train_loader))))
 
             for _iter, data in enumerate(train_loader, 0):
                 # get the inputs; data is a list of [inputs, labels]
+                iter_per_epoch = len(train_loader)
                 inputs, labels = data
 
                 if cuda_available:
@@ -331,20 +344,50 @@ class PytorchModel:
                 optimizer.step()
 
                 running_loss += loss.item()
+                train_epoch_loss += loss.item()
 
                 _, predicted = torch.max(outputs.data, 1)
                 epoch_total_labeled += labels.size(0)
                 batch_correctly_labeled = (predicted == labels).sum().item()
                 epoch_correctly_labeled += batch_correctly_labeled
 
-                if _iter % logging_rate == 0:
-                    self.log_training_info(epoch, max_num_of_epochs, _iter,
-                                           train_loader, batch_correctly_labeled, running_loss, logging_rate)
-                    running_loss = 0.0
+                # TODO - resume this once logging every few iterations instead of logging at the end of epoch alone
+                # if _iter % logging_rate == 0 and config.log_only_at_epoch_end:
+                #     self.logger.info('Training stats ========= Epoch {}/{} ========= Iteration {}/{} ========= '
+                #                          'Batch Accuracy {} ========= loss {} ========='.
+                #                          format(epoch + 1, max_num_of_epochs, _iter, iter_per_epoch,
+                #                                 batch_correctly_labeled / config.batch_size,
+                #                                 running_loss / logging_rate))
+                #
+                #     self.log_training_info(
+                #         epoch=epoch, max_num_of_epochs=max_num_of_epochs,
+                #         _iter=-1, iter_per_epoch=iter_per_epoch,
+                #         batch_correctly_labeled=batch_correctly_labeled,
+                #         logging_rate=logging_rate, running_loss=running_loss,
+                #         val_loss=0, val_accu=0,
+                #         at_epoch_end=False
+                #     )
+                #     running_loss = 0.0
 
-            self.logger.info('Epoch {} Accuracy is {}'.format(epoch + 1, epoch_correctly_labeled / epoch_total_labeled))
+            # end of an epoch
+            train_epoch_accu = epoch_correctly_labeled / epoch_total_labeled
+            self.logger.info('Training Epoch {}/{} stats ========= Epoch Accuracy {} ========= Epoch loss {} ========='
+                             .format(epoch + 1, max_num_of_epochs, train_epoch_accu, train_epoch_loss))
 
-            stop_flag, prev_valid_loss = self.validate_model(epoch, prev_valid_loss, valid_loader)
+            # validation phase
+            stop_flag, prev_valid_loss, val_accu = self.validate_model(epoch, max_num_of_epochs,
+                                                                       prev_valid_loss, valid_loader)
+
+            if config.log_only_at_epoch_end:
+                self.log_training_info(epoch=epoch, max_num_of_epochs=max_num_of_epochs,
+                                       _iter=-1, iter_per_epoch=-1,
+                                       batch_correctly_labeled=-1,
+                                       logging_rate=logging_rate, running_loss=-1,
+                                       train_epoch_accu=train_epoch_accu, train_epoch_loss=train_epoch_loss,
+                                       val_loss=prev_valid_loss, val_accu=val_accu,
+                                       at_epoch_end=True)
+
+            # TODO - change early stop to only after 5 epochs with no improvment instead of after 1
             if stop_flag:
                 num_of_train_epochs = epoch
                 break
@@ -354,16 +397,16 @@ class PytorchModel:
         self.save_pytorch_model(optimizer, loss, num_of_train_epochs)
         return num_of_train_epochs
 
-    def validate_model(self, epoch, prev_loss, valid_loader):
-        accuracy, curr_loss = self.test_model(data_loader=valid_loader, validation_flag=True)
-        self.logger.info('Validation set -- epoch {} -- accuracy {} -- loss {} -- previous loss {}'.
-                         format(epoch + 1, accuracy, curr_loss, prev_loss))
+    def validate_model(self, epoch, max_num_of_epochs, prev_loss, valid_loader):
+        val_accu, curr_loss = self.test_model(data_loader=valid_loader, validation_flag=True)
+        self.logger.info('Validation set -- epoch {}/{} -- accuracy {} -- loss {} -- previous loss {}'.
+                         format(epoch + 1, max_num_of_epochs, val_accu, curr_loss, prev_loss))
 
-        if epoch > config['min_num_of_epochs'] and curr_loss >= prev_loss:
+        if epoch > config.min_num_of_epochs and curr_loss >= prev_loss:
             self.logger.info('Early stopping criteria is meet, stopping training after {} epochs'.format(epoch + 1))
-            return True, prev_loss
+            return True, curr_loss, val_accu
         else:
-            return False, curr_loss
+            return False, curr_loss, val_accu
 
     def test_model(self, data_loader, validation_flag=False):
         criterion = nn.CrossEntropyLoss().cuda()

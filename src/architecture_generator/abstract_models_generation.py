@@ -1,12 +1,12 @@
 import copy
-import json
 import os
 import uuid
 import json
 
 import pandas as pd
 
-from NNLayers import *
+from src.architecture_generator.NNLayers import *
+import config
 
 
 # ================================ UTILS ===============================================================================
@@ -60,17 +60,16 @@ def random_layer(prev_layer):
             layers = [DropoutLayer, ActivationLayer, ConvLayer, PoolingLayer, IdentityLayer]
             return layers[random.randint(0, len(layers) - 1)]()
 
-        elif isinstance(prev_layer ,ActivationLayer):
+        elif isinstance(prev_layer, ActivationLayer):
             layers = [DropoutLayer, BatchNormLayer, ConvLayer, PoolingLayer, IdentityLayer]
             return layers[random.randint(0, len(layers) - 1)]()
 
-        elif isinstance(prev_layer ,PoolingLayer):
+        elif isinstance(prev_layer, PoolingLayer):
             layers = [DropoutLayer, BatchNormLayer, ActivationLayer, ConvLayer, IdentityLayer]
             return layers[random.randint(0, len(layers) - 1)]()
 
     layers = [DropoutLayer, BatchNormLayer, ActivationLayer, ConvLayer, PoolingLayer, IdentityLayer]
     return layers[random.randint(0, len(layers) - 1)]()
-
 
 
 # ========================== Model Validate and FIX ====================================================================
@@ -83,8 +82,8 @@ def fix_layers_dims(layer, prev_layer):
 
 def check_legal_model(layer_collection):
     # TODO - add checks to this method, doesnt validate network properly
-    height = config['dataset_height']
-    width = config['dataset_width']
+    height = config.dataset_height
+    width = config.dataset_width
     for layer in layer_collection:
         if type(layer) == ConvLayer or type(layer) == PoolingLayer:
             height = (height - layer.height) / layer.stride + 1
@@ -108,14 +107,14 @@ def check_legal_model(layer_collection):
 
 # TODO -  This method is not used in this class, being called from NASUTILS, maybe we need to move it to NASUTILS
 def finalize_model(layer_collection):
-    if config['grid']:
+    if config.grid:
         # TODO - add support for grid (parallel layers, skip connections)
         # return ModelFromGrid(layer_collection)
         pass
     else:
         # TODO - shouldnt we add input layer here ???
         layer_collection = copy.deepcopy(layer_collection)
-        output_layer = LinearLayer(config['num_classes'])
+        output_layer = LinearLayer(config.num_classes)
         activation = ActivationLayer('softmax')
         layer_collection.append(output_layer)
         layer_collection.append(activation)
@@ -124,7 +123,7 @@ def finalize_model(layer_collection):
 
 def get_model_true_depth(model):
     model_depth = 0
-    if config['grid']:
+    if config.grid:
         # TODO - add support for parallel layers and skip connections
         print('Error - add support for parallel layers and skip connections')
         pass
@@ -163,7 +162,7 @@ def get_model_true_depth(model):
 
 def generate_abstract_model():
     model_id = uuid.uuid4()
-    model, attemptes_num = random_model(config['max_network_depth'], attempts_num=0)
+    model, attemptes_num = random_model(config.max_network_depth, attempts_num=0)
     model = finalize_model(model)
     print('Generated model {} number of attempts for creation was {}'.format(model_id, attemptes_num))
     return model_id, model
@@ -171,8 +170,18 @@ def generate_abstract_model():
 
 def save_configuration_as_json(models_save_path):
     conf_file = models_save_path + '/config.json'
-    with open(conf_file, 'w') as fp:
-        json.dump(config, fp)
+    config_dict = dict([(key, value) for key, value in config.__dict__.items() if "__" not in str(key)])
+
+    if os.path.isfile(conf_file) and os.path.getsize(conf_file) > 0:
+        with open(conf_file, 'r') as json_file:
+            old_config_dict = json.load(json_file)
+            if old_config_dict == config_dict:
+                print("config json already exist with same configurations, no need to overwrite it")
+            else:
+                json.dump(config_dict, json_file)
+    else:
+        with open(conf_file, 'w') as fp:
+            json.dump(config_dict, fp)
         print('Configuration file was saved as JSON to {}'.format(conf_file))
 
 
@@ -189,16 +198,17 @@ def save_abstract_model_to_csv(model, model_id, model_test_accuracy, num_of_trai
          'model_test_accuracy': model_test_accuracy,
          }, ignore_index=True)
 
-    models_save_path = os.path.dirname(config['models_save_path'])
+    models_save_path = os.path.dirname(__file__) + "/../.." + config.models_save_path
     if not os.path.exists(models_save_path):
         os.makedirs(models_save_path)
 
     models_csv_file = models_save_path + '/abstract_models.csv'
+    save_configuration_as_json(models_save_path)
+
     if os.path.isfile(models_csv_file):
         abstract_models_df.to_csv(models_csv_file, mode='a', header=False, index=False)
         print('Abstract Model {} was saved to {} file'.format(model_id, models_csv_file))
 
     else:
         abstract_models_df.to_csv(models_csv_file, index=False)
-        print('CSV file was created with name {} and Model {} was added to it'.format(model_id,models_csv_file))
-        save_configuration_as_json(models_save_path)
+        print('CSV file was created with name {} and Model {} was added to it'.format(model_id, models_csv_file))

@@ -1,6 +1,5 @@
 import random
-from config import config
-
+import config
 
 class Layer():
     def __init__(self, name=None):
@@ -37,7 +36,7 @@ class DropoutLayer(Layer):
     def __init__(self, rate=None, name=None):
         Layer.__init__(self, name)
         if rate is None:
-            rate = random.uniform(0, config['dropout_max_rate'])
+            rate = random.uniform(0, config.dropout_max_rate)
         self.rate = rate
 
     def __str__(self):
@@ -71,7 +70,7 @@ class LinearLayer(Layer):
     def __init__(self, output_dim=None, name=None):
         Layer.__init__(self, name)
         if output_dim is None:
-            output_dim = random.randint(1, config['linear_max_dim'])
+            output_dim = random.randint(1, config.linear_max_dim)
         self.output_dim = output_dim
 
     def __str__(self):
@@ -84,13 +83,13 @@ class ConvLayer(Layer):
     def __init__(self, height=None, width=None, out_channels=None, stride=None, name=None):
         Layer.__init__(self, name)
         if height is None:
-            height = random.randint(1, config['conv_max_height'])
+            height = random.randint(1, config.conv_max_height)
         if width is None:
-            width = random.randint(1, config['conv_max_width'])
+            width = random.randint(1, config.conv_max_width)
         if out_channels is None:
-            out_channels = random.randint(1, config['conv_max_filters'])
+            out_channels = random.randint(1, config.conv_max_filters)
         if stride is None:
-            stride = random.randint(1, config['conv_max_stride'])
+            stride = random.randint(1, config.conv_max_stride)
         self.height = height
         self.width = width
         self.channels = out_channels
@@ -106,11 +105,11 @@ class PoolingLayer(Layer):
     def __init__(self, height=None, width=None, stride=None, mode='max', name=None):
         Layer.__init__(self, name)
         if height is None:
-            height = random.randint(1, config['pool_max_height'])
+            height = random.randint(1, config.pool_max_height)
         if width is None:
-            width = random.randint(1, config['pool_max_width'])
+            width = random.randint(1, config.pool_max_width)
         if stride is None:
-            stride = random.randint(1, config['pool_max_stride'])
+            stride = random.randint(1, config.pool_max_stride)
         self.height = height
         self.width = width
         self.stride = stride
