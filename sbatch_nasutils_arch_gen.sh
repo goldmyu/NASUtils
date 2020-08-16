@@ -7,8 +7,8 @@
 
 #SBATCH --partition short						### specify partition name where to run a job. debug: 2 hours limit; short: 7 days limit
 #SBATCH --time 0-12:00:00			            ### limit the time of job running, partition limit can override this. Format: D-H:MM:SS
-#SBATCH --job-name lstm_test			        ### name of the job
-#SBATCH --output output_logs/lstm_test_job-%J.out			### output log for running job - %J for job number
+#SBATCH --job-name arch_gen			        ### name of the job
+#SBATCH --output output_logs/arch_gen-%J.out			### output log for running job - %J for job number
 #SBATCH --mail-user=goldmyu@post.bgu.ac.il	    ### user email for sending job status
 ##SBATCH --mail-type=ALL						### conditions when to send the email. ALL,BEGIN,END,FAIL, REQUEU, NONE
 #SBATCH --gres=gpu:1							### number of GPUs, ask for more than 1 only if you can parallelize your code for multi GPU
@@ -30,5 +30,4 @@ source activate nasutils				### activating environment, environment must be conf
 										### You may use multiple srun lines, they are the job steps.
 										### --mem - memory to allocate: use 24G x number for each allocated GPUs (24G * nGPU)
 
-#python src/test_lstm.py
-python src/main.py
+python src/architecture_generator/main.py

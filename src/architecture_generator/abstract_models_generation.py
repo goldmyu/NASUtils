@@ -5,7 +5,7 @@ import json
 
 import pandas as pd
 
-from src.architecture_generator.NNLayers import *
+from NNLayers import *
 import config
 
 

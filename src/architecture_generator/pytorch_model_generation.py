@@ -1,7 +1,7 @@
 import torch
 from torch import nn
 import numpy as np
-from src.architecture_generator.NNLayers import *
+from NNLayers import *
 import config
 
 

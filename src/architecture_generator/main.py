@@ -1,6 +1,6 @@
-from src.architecture_generator.abstract_models_generation import *
-from src.architecture_generator.pytorch_model_generation import *
-from src.architecture_generator.pytorch_model_train import *
+from abstract_models_generation import *
+from pytorch_model_generation import *
+from pytorch_model_train import *
 
 
 # ======================================================================================================================

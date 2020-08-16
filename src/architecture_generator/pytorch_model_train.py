@@ -17,7 +17,8 @@ import logging.handlers
 
 import config
 
-# region ============================= General Settings ================================================================
+# ================================= General Settings ===================================================================
+
 torch.multiprocessing.set_sharing_strategy('file_system')
 
 cuda_available = torch.cuda.is_available()
@@ -59,8 +60,11 @@ class PytorchModel:
                                                       'activation_max', 'activation_min', 'activation_mean',
                                                       'activation_var', 'activation_std',
                                                       'iteration', 'epoch'])
+        self.epoch_training_info_df = pd.DataFrame(columns=['epoch',
+                                                            'train_epoch_loss', 'train_epoch_accu',
+                                                            'val_loss', 'val_accu'])
 
-    # region ========================== Helper methods =================================================================
+    # ================================ Helper methods ======================================================================
 
     def set_logger(self):
         dirname = os.path.dirname(__file__)
@@ -194,11 +198,8 @@ class PytorchModel:
                 break
         return _temp_dict
 
-    def log_training_info(self, epoch, max_num_of_epochs, _iter,
-                          iter_per_epoch, batch_correctly_labeled, logging_rate,
-                          running_loss, train_epoch_accu, train_epoch_loss,
-                          val_loss, val_accu,
-                          at_epoch_end=False):
+    def log_training_info(self, epoch, _iter, train_epoch_accu,
+                          train_epoch_loss, val_loss, val_accu, at_epoch_end=False):
 
         temp_dict = {}
         # This happens for every layer in the model
@@ -233,9 +234,13 @@ class PytorchModel:
                 if config.log_activations:
                     temp_dict = self.log_activations(temp_dict)
 
-    # endregion
+    def log_at_epoch_end(self, epoch, train_epoch_accu, train_epoch_loss,
+                         val_loss, val_accu):
+        temp_dict = {'epoch': epoch, 'val_accu': val_accu, 'val_loss': val_loss, 'train_epoch_accu': train_epoch_accu,
+                     'train_epoch_loss': train_epoch_loss}
+        self.epoch_training_info_df = self.epoch_training_info_df.append(temp_dict, ignore_index=True)
 
-    # region ========================== Main methods ===================================================================
+# ================================= Main methods =======================================================================
 
     def set_train_and_test_model(self):
         self.set_logger()
@@ -379,13 +384,8 @@ class PytorchModel:
                                                                        prev_valid_loss, valid_loader)
 
             if config.log_only_at_epoch_end:
-                self.log_training_info(epoch=epoch, max_num_of_epochs=max_num_of_epochs,
-                                       _iter=-1, iter_per_epoch=-1,
-                                       batch_correctly_labeled=-1,
-                                       logging_rate=logging_rate, running_loss=-1,
-                                       train_epoch_accu=train_epoch_accu, train_epoch_loss=train_epoch_loss,
-                                       val_loss=prev_valid_loss, val_accu=val_accu,
-                                       at_epoch_end=True)
+                self.log_at_epoch_end(epoch=epoch, train_epoch_accu=train_epoch_accu, train_epoch_loss=train_epoch_loss,
+                                      val_loss=prev_valid_loss, val_accu=val_accu)
 
             # TODO - change early stop to only after 5 epochs with no improvment instead of after 1
             if stop_flag:
