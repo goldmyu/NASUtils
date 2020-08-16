@@ -1,4 +1,4 @@
-models_save_path = '/generated_files/experiment7/'
+models_save_path = '/generated_files/experiment_7/'
 
 grid = False
 population_size = 5000
@@ -28,12 +28,11 @@ batch_size = 256
 num_of_dataloader_workers = 4
 
 max_num_of_epochs = 50
-min_num_of_epochs = 20
+min_num_of_epochs = 50
 
 validation_size = 0.2
 
-log_only_at_epoch_end = True
 logging_rate_initial = 10
-
+log_only_at_epoch_end = True
 log_weights = True
 log_activations = True

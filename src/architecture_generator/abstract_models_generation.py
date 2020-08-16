@@ -6,7 +6,7 @@ import json
 import pandas as pd
 
 from NNLayers import *
-import config
+import arch_gen_config as config
 
 
 # ================================ UTILS ===============================================================================

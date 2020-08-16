@@ -2,7 +2,7 @@ import torch
 from torch import nn
 import numpy as np
 from NNLayers import *
-import config
+import arch_gen_config as config
 
 
 # ================================== Pytorch Code Genration ============================================================

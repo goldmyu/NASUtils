@@ -1,6 +1,7 @@
 from abstract_models_generation import *
 from pytorch_model_generation import *
 from pytorch_model_train import *
+import arch_gen_config as config
 
 
 # ======================================================================================================================

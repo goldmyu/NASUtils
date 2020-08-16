@@ -1,5 +1,5 @@
 import random
-import config
+import arch_gen_config as config
 
 class Layer():
     def __init__(self, name=None):

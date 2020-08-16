@@ -15,7 +15,7 @@ from torch.utils.tensorboard import SummaryWriter
 import logging
 import logging.handlers
 
-import config
+import arch_gen_config as config
 
 # ================================= General Settings ===================================================================
 
@@ -394,6 +394,7 @@ class PytorchModel:
 
         self.logger.info('Finished Training')
         self.training_info_df.to_csv(self.save_path + 'model-' + str(self.model_id) + '.csv', index=False)
+        self.epoch_training_info_df.to_csv(self.save_path + 'model_epochs_data-' + str(self.model_id) + '.csv', index=False)
         self.save_pytorch_model(optimizer, loss, num_of_train_epochs)
         return num_of_train_epochs
 

@@ -32,7 +32,7 @@ cat << EOF
 #SBATCH --time=$TIME
 #SBATCH --gres=gpu:$GPU
 ##SBATCH -J pycharm_server
-#SBATCH -o $CWD/pycharm_session_%J.log
+#SBATCH -o $CWD/output_logs/pycharm_session_%J.log
 
 #
 launch='sleep 600'
