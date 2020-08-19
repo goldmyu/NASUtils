@@ -298,9 +298,9 @@ class PytorchModel:
 
         # Train and then test the model
         num_of_train_epochs = self.train_model(train_loader, validate_loader)
-        model_test_accuracy = self.test_model(test_loader)
+        model_test_accuracy, model_test_loss = self.test_model(test_loader)
 
-        return model_test_accuracy, num_of_train_epochs
+        return model_test_accuracy, model_test_loss, num_of_train_epochs
 
     def train_model(self, train_loader, valid_loader):
         criterion = nn.CrossEntropyLoss().cuda()
@@ -318,7 +318,7 @@ class PytorchModel:
         for epoch in range(max_num_of_epochs):  # loop over the dataset multiple times
             logging_rate = logging_rate * (epoch + 1)
             running_loss = 0.0
-            train_epoch_loss = 0
+            epoch_loss = 0
             epoch_correctly_labeled = 0
             epoch_total_labeled = 0
             iter_per_epoch = 0
@@ -344,12 +344,12 @@ class PytorchModel:
                 # forward + backward + optimize
                 outputs = self.model(inputs)
 
-                loss = criterion(outputs, labels)
-                loss.backward()
+                avg_batch_loss = criterion(outputs, labels)
+                avg_batch_loss.backward()
                 optimizer.step()
 
-                running_loss += loss.item()
-                train_epoch_loss += loss.item()
+                running_loss += avg_batch_loss.item()
+                epoch_loss += avg_batch_loss.item()
 
                 _, predicted = torch.max(outputs.data, 1)
                 epoch_total_labeled += labels.size(0)
@@ -375,16 +375,18 @@ class PytorchModel:
                 #     running_loss = 0.0
 
             # end of an epoch
-            train_epoch_accu = epoch_correctly_labeled / epoch_total_labeled
-            self.logger.info('Training Epoch {}/{} stats ========= Epoch Accuracy {} ========= Epoch loss {} ========='
-                             .format(epoch + 1, max_num_of_epochs, train_epoch_accu, train_epoch_loss))
+            epoch_accu = epoch_correctly_labeled / epoch_total_labeled
+            avg_epoch_loss = epoch_loss/len(train_loader)
+
+            self.logger.info('Training Epoch {}/{} stats ==== Accuracy {:.4f} ==== Avg Epoch loss {:.4f} ===='
+                             .format(epoch + 1, max_num_of_epochs, epoch_accu, avg_epoch_loss))
 
             # validation phase
             stop_flag, prev_valid_loss, val_accu = self.validate_model(epoch, max_num_of_epochs,
                                                                        prev_valid_loss, valid_loader)
 
             if config.log_only_at_epoch_end:
-                self.log_at_epoch_end(epoch=epoch, train_epoch_accu=train_epoch_accu, train_epoch_loss=train_epoch_loss,
+                self.log_at_epoch_end(epoch=epoch, train_epoch_accu=epoch_accu, train_epoch_loss=epoch_loss,
                                       val_loss=prev_valid_loss, val_accu=val_accu)
 
             # TODO - change early stop to only after 5 epochs with no improvment instead of after 1
@@ -395,13 +397,13 @@ class PytorchModel:
         self.logger.info('Finished Training')
         self.training_info_df.to_csv(self.save_path + 'model-' + str(self.model_id) + '.csv', index=False)
         self.epoch_training_info_df.to_csv(self.save_path + 'model_epochs_data-' + str(self.model_id) + '.csv', index=False)
-        self.save_pytorch_model(optimizer, loss, num_of_train_epochs)
+        self.save_pytorch_model(optimizer, avg_batch_loss, num_of_train_epochs)
         return num_of_train_epochs
 
     def validate_model(self, epoch, max_num_of_epochs, prev_loss, valid_loader):
         val_accu, curr_loss = self.test_model(data_loader=valid_loader, validation_flag=True)
-        self.logger.info('Validation set -- epoch {}/{} -- accuracy {} -- loss {} -- previous loss {}'.
-                         format(epoch + 1, max_num_of_epochs, val_accu, curr_loss, prev_loss))
+        self.logger.info('Validation Epoch {}/{} stats ==== accuracy {:.4f} ==== loss {:.4f} ==== '
+                         'previous loss {:.4f}\n'.format(epoch + 1, max_num_of_epochs, val_accu, curr_loss, prev_loss))
 
         if epoch > config.min_num_of_epochs and curr_loss >= prev_loss:
             self.logger.info('Early stopping criteria is meet, stopping training after {} epochs'.format(epoch + 1))
@@ -424,18 +426,19 @@ class PytorchModel:
                     labels = labels.cuda()
 
                 outputs = self.model(images)
-                loss = criterion(outputs, labels)
-                running_loss += loss.item()
+                avg_batch_loss = criterion(outputs, labels)
+                running_loss += avg_batch_loss.item()
 
                 _, predicted = torch.max(outputs.data, 1)
                 total_predictions += labels.size(0)
                 correctly_labeled += (predicted == labels).sum().item()
 
         model_accuracy = correctly_labeled / total_predictions
+        model_avg_loss = running_loss/len(data_loader)
 
         if validation_flag:
-            return model_accuracy, running_loss
+            return model_accuracy, model_avg_loss
         else:
-            self.logger.info('Test set accuracy is {}'.format(model_accuracy))
-            return model_accuracy
+            print('\nTest set stats === accuracy {:.4f} === loss {:.4f}\n'.format(model_accuracy, model_avg_loss))
+            return model_accuracy, model_avg_loss
     # endregion

@@ -185,7 +185,7 @@ def save_configuration_as_json(models_save_path):
         print('Configuration file was saved as JSON to {}'.format(conf_file))
 
 
-def save_abstract_model_to_csv(model, model_id, model_test_accuracy, num_of_train_epochs):
+def save_abstract_model_to_csv(model, model_id, model_test_accuracy, model_test_loss,num_of_train_epochs):
     abstract_models_df = pd.DataFrame(columns=['model_id', 'model_layers',
                                                'model_depth', 'num_of_train_epochs',
                                                'model_test_accuracy'])
@@ -196,6 +196,7 @@ def save_abstract_model_to_csv(model, model_id, model_test_accuracy, num_of_trai
          'model_depth': get_model_true_depth(model),
          'num_of_train_epochs': num_of_train_epochs,
          'model_test_accuracy': model_test_accuracy,
+         'model_test_loss': model_test_loss,
          }, ignore_index=True)
 
     models_save_path = os.path.dirname(__file__) + "/../.." + config.models_save_path

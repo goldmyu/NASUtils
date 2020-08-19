@@ -31,6 +31,7 @@ cat << EOF
 ##SBATCH --cpus-per-task=1
 #SBATCH --time=$TIME
 #SBATCH --gres=gpu:$GPU
+#SBATCH --mem=4G
 ##SBATCH -J pycharm_server
 #SBATCH -o $CWD/output_logs/pycharm_session_%J.log
 
