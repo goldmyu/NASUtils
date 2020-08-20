@@ -5,6 +5,7 @@ import torchvision
 import numpy as np
 from torch.utils.data.sampler import SubsetRandomSampler
 from torch.utils.tensorboard import SummaryWriter
+from datetime import datetime
 
 # =========================== CUDA =====================================================================================
 
@@ -18,19 +19,23 @@ print('CUDA available? {} Device is {}'.format(cuda_available, device))
 if cuda_available:
     print('Number of available CUDA devices {}\n'.format(torch.cuda.device_count()))
 
-dir_name = os.path.dirname(__file__)
-# save_path = dir_name + '/../../generated_files/tensorboard_experiment'
-save_path = dir_name + '/../../generated_files/experiment_8/model-0af70747-263c-4c78-8bac-fa32d2936c4c/'
-
-
 # =========================== Hyper-params =============================================================================
 
-max_num_of_epochs = 10
+model_name = 'densenet121'
+dir_name = os.path.dirname(__file__)
+now = datetime.now()
+now_date_time = now.strftime("%d-%m-%Y_%H%M")
+
+save_path = dir_name + '/../../generated_files/tensorboard_experiment/' + model_name + '_' + now_date_time
+load_path = dir_name + '/../../generated_files/experiment_8/model-0af70747-263c-4c78-8bac-fa32d2936c4c/'
+
+max_num_of_epochs = 25
 batch_size = 64
 valid_size = 0.1
-
+learning_rate = 0.1
 
 # =========================== Model def ================================================================================
+
 
 class Net(torch.nn.Module):
     def __init__(self):
@@ -65,6 +70,8 @@ class Net(torch.nn.Module):
         return x
 
 
+# =========================== Utils Methods ============================================================================
+
 def write_model_summery(train_loader, _model):
     writer = SummaryWriter(save_path)
     images, labels = next(iter(train_loader))
@@ -76,53 +83,49 @@ def write_model_summery(train_loader, _model):
         model.cuda()
 
 
-def validate_model(epoch, max_num_of_epochs, prev_loss, valid_loader):
-    val_accu, curr_loss = test_model(data_loader=valid_loader, validation_flag=True)
-    print('Validation Epoch {}/{} stats ==== accuracy {:.4f} ==== loss {:.4f} ==== previous loss {:.4f}\n'.
-          format(epoch + 1, max_num_of_epochs, val_accu, curr_loss, prev_loss))
+def save_pytorch_model(_model_name):
+    save_file_path = save_path + '/' + _model_name + '_model_save.pt'
+    torch.save(model, save_file_path)
 
-    if curr_loss >= prev_loss:
-        print('Early stopping criteria is meet, stopping training after {} epochs'.format(epoch + 1))
-        return True, curr_loss, val_accu
-    else:
-        return False, curr_loss, val_accu
+    # torch.save({
+    #     'model': model,
+    #     'optimizer': optimizer,
+    #     'epoch': epoch,
+    #     'loss': loss
+    # }, save_file)
+
+    # torch.save(obj={
+    #     'model_state_dict': model.state_dict(),
+    #     'optimizer_state_dict': optimizer.state_dict(),
+    #     'epoch': epoch,
+    #     'loss': loss, }
+    #     , f=save_file)
 
 
-def test_model(data_loader, validation_flag=False):
-    criterion = torch.nn.CrossEntropyLoss().cuda()
-    correctly_labeled = 0
-    total_predictions = 0
-    running_loss = 0
+def load_pytorch_model():
+    # load_file_path = save_path + '/model_save.pt'
+    load_file_path = load_path + 'pytorch_model-0af70747-263c-4c78-8bac-fa32d2936c4c.pt'
 
-    with torch.no_grad():
-        for data in data_loader:
+    # model = torch.nn.Sequential()
+    # model = torch.nn.DataParallel(model)
 
-            images, labels = data
-            if cuda_available:
-                images = images.cuda()
-                labels = labels.cuda()
+    model = torch.load(load_file_path)
+    # model.load_state_dict(checkpoint['model_state_dict'])
 
-            outputs = model(images)
-            avg_batch_loss = criterion(outputs, labels)
-            running_loss += avg_batch_loss.item()
+    # optimizer = torch.optim.Adam(params=model.parameters())
+    # optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
+    # epoch = checkpoint['epoch']
+    # loss = checkpoint['loss']
 
-            _, predicted = torch.max(outputs.data, 1)
-            total_predictions += labels.size(0)
-            correctly_labeled += (predicted == labels).sum().item()
+    model.eval()
+    # - or -
+    # model.train()
+    return model
 
-    model_accuracy = correctly_labeled / total_predictions
-    model_avg_loss = running_loss / len(data_loader)
 
-    if validation_flag:
-        return model_accuracy, model_avg_loss
-    else:
-        print('\nTest set stats === accuracy {:.4f} === loss {:.4f}\n'.format(model_accuracy, model_avg_loss))
-        return model_accuracy
-
+# =========================== Train, Validate and Test Methods =========================================================
 
 def train_model(train_loader, valid_loader):
-    criterion = torch.nn.CrossEntropyLoss().cuda()
-    optimizer = torch.optim.Adam(model.parameters())
     prev_valid_loss = float('inf')
 
     for epoch in range(max_num_of_epochs):  # loop over the dataset multiple times
@@ -169,48 +172,51 @@ def train_model(train_loader, valid_loader):
         _, prev_valid_loss, _ = validate_model(epoch, max_num_of_epochs, prev_valid_loss, valid_loader)
 
 
-def save_pytorch_model():
-    save_file_path = save_path + '/model_save.pt'
-    torch.save(model, save_file_path)
+def validate_model(epoch, max_num_of_epochs, prev_loss, valid_loader):
+    val_accu, curr_loss = test_model(data_loader=valid_loader, validation_flag=True)
+    print('Validation Epoch {}/{} stats ==== accuracy {:.4f} ==== loss {:.4f} ==== previous loss {:.4f}\n'.
+          format(epoch + 1, max_num_of_epochs, val_accu, curr_loss, prev_loss))
 
-    # torch.save({
-    #     'model': model,
-    #     'optimizer': optimizer,
-    #     'epoch': epoch,
-    #     'loss': loss
-    # }, save_file)
-
-    # torch.save(obj={
-    #     'model_state_dict': model.state_dict(),
-    #     'optimizer_state_dict': optimizer.state_dict(),
-    #     'epoch': epoch,
-    #     'loss': loss, }
-    #     , f=save_file)
+    if curr_loss >= prev_loss:
+        print('Early stopping criteria is meet, stopping training after {} epochs'.format(epoch + 1))
+        return True, curr_loss, val_accu
+    else:
+        return False, curr_loss, val_accu
 
 
-def load_pytorch_model():
-    # load_file_path = save_path + '/model_save.pt'
-    load_file_path = save_path + 'pytorch_model-0af70747-263c-4c78-8bac-fa32d2936c4c.pt'
+def test_model(data_loader, validation_flag=False):
+    criterion = torch.nn.CrossEntropyLoss().cuda()
+    correctly_labeled = 0
+    total_predictions = 0
+    running_loss = 0
+
+    with torch.no_grad():
+        for data in data_loader:
+
+            images, labels = data
+            if cuda_available:
+                images = images.cuda()
+                labels = labels.cuda()
+
+            outputs = model(images)
+            avg_batch_loss = criterion(outputs, labels)
+            running_loss += avg_batch_loss.item()
+
+            _, predicted = torch.max(outputs.data, 1)
+            total_predictions += labels.size(0)
+            correctly_labeled += (predicted == labels).sum().item()
+
+    model_accuracy = correctly_labeled / total_predictions
+    model_avg_loss = running_loss / len(data_loader)
+
+    if validation_flag:
+        return model_accuracy, model_avg_loss
+    else:
+        print('\nTest set stats === accuracy {:.4f} === loss {:.4f}\n'.format(model_accuracy, model_avg_loss))
+        return model_accuracy
 
 
-    # model = torch.nn.Sequential()
-    # model = torch.nn.DataParallel(model)
-
-    model = torch.load(load_file_path)
-    # model.load_state_dict(checkpoint['model_state_dict'])
-
-    # optimizer = torch.optim.Adam(params=model.parameters())
-    # optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
-    # epoch = checkpoint['epoch']
-    # loss = checkpoint['loss']
-
-    model.eval()
-    # - or -
-    # model.train()
-    return model
-
-
-# ======================================================================================================================
+# ===================================== Data loading and preperation ===================================================
 
 transform = torchvision.transforms.Compose([
     # torchvision.transforms.Resize(256),
@@ -244,24 +250,27 @@ validloader = torch.utils.data.DataLoader(trainset, batch_size=batch_size, sampl
 testloader = torch.utils.data.DataLoader(testset, batch_size=batch_size,
                                          shuffle=False, num_workers=2)
 
-# classes = ('plane', 'car', 'bird', 'cat',
-#            'deer', 'dog', 'frog', 'horse', 'ship', 'truck')
 
+# ===================================== Main Section ===================================================================
+
+model = torch.hub.load('pytorch/vision:v0.6.0', model_name, pretrained=False).to(device)
 
 # model = Net().to(device)
 # model = torch.hub.load('pytorch/vision:v0.6.0', 'alexnet', pretrained=False).to(device)
-# model = torchvision.models.alexnet(pretrained=False, progress=True).to(device)
 # model = torch.hub.load('pytorch/vision:v0.6.0', 'vgg11', pretrained=False).to(device)
-# model = torchvision.models.vgg11(pretrained=False, progress=True).to(device)
-# model = torch.hub.load('pytorch/vision:v0.6.0', 'densenet121', pretrained=False).to(device)
 # model = torch.hub.load('pytorch/vision:v0.6.0', 'resnet18', pretrained=False).to(device)
 # model = torch.hub.load('pytorch/vision:v0.6.0', 'inception_v3', pretrained=False).to(device)
+# model = torch.hub.load('pytorch/vision:v0.6.0', 'densenet121', pretrained=False).to(device)
+
+criterion = torch.nn.CrossEntropyLoss().cuda()
+optimizer = torch.optim.SGD(model.parameters(), lr=learning_rate, momentum=0.9, weight_decay=5e-4)
+# optimizer = torch.optim.Adam(model.parameters())
 
 
-# write_model_summery(trainloader, model)
-# train_model(trainloader, validloader)
-# test_model(testloader)
-# save_pytorch_model()
-
-model = load_pytorch_model()
+write_model_summery(trainloader, model)
+train_model(trainloader, validloader)
 test_model(testloader)
+save_pytorch_model(model_name)
+
+# model = load_pytorch_model()
+# test_model(testloader)
